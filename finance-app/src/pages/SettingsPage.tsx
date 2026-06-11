@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { 
-  User, Globe, Moon, Sun, Download, Trash2, 
-  Bell, Shield, ChevronRight, Mail, CreditCard 
+  Globe, Moon, Sun, Download, Trash2, 
+  Bell, Shield, Mail, CreditCard 
 } from 'lucide-react';
 
 import { useAppStore } from '../store/useAppStore';
 import { useTransactionStore } from '../store/useTransactionStore';
-import { APP_T } from '../locales/translations';
 import { downloadCSV } from '../utils/export';
 
 const containerVariants: Variants = {
@@ -22,7 +21,6 @@ const itemVariants: Variants = {
 
 export default function SettingsPage() {
   const { lang, setLang, isDarkMode } = useAppStore();
-  const t = APP_T[lang] || APP_T['en'];
   
   // ДОБАВЛЕНО: Достаем транзакции из хранилища, чтобы было что скачивать!
   const transactions = useTransactionStore((state) => state.transactions);

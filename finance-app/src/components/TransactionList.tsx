@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, } from 'framer-motion';
 import { 
   Search, ArrowUpRight, ArrowDownRight, Trash2, 
   CreditCard, Repeat, CheckCircle2, Clock, Copy, Check
@@ -22,7 +22,7 @@ interface TransactionListProps {
   t: any;
 }
 
-export default function TransactionList({ transactions, onDelete, formatAmount, t }: TransactionListProps) {
+export default function TransactionList({ transactions, onDelete, formatAmount }: TransactionListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, e: React.MouseEvent) => {

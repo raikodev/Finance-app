@@ -27,7 +27,6 @@ export const TransactionModal = ({
   onSave, 
   t, 
   currency, 
-  rates 
 }: TransactionModalProps) => {
   const [isScanning, setIsScanning] = useState(false);
   const [extractedTx, setExtractedTx] = useState<ExtractedTransaction[] | null>(null);

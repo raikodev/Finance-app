@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { 
   BarChart3, Download, TrendingUp, TrendingDown, 

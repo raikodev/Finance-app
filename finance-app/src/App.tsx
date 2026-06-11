@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { PieChart, Wallet, BarChart3, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { useAppStore } from './store/useAppStore';
 import { useAuthStore } from './store/useAuthStore';
@@ -83,14 +83,14 @@ export default function App() {
   );
 }
 
-function ConstructionPage({ title, icon }: { title: string, icon: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center animate-in fade-in zoom-in duration-300">
-      <div className="p-4 bg-gray-100 dark:bg-gray-800/50 rounded-full mb-4 text-gray-400">
-        {icon}
-      </div>
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{title}</h2>
-      <p className="text-gray-500 dark:text-gray-400">This page is currently under construction.</p>
-    </div>
-  );
-}
+// function ConstructionPage({ title, icon }: { title: string, icon: React.ReactNode }) {
+//   return (
+//     <div className="flex flex-col items-center justify-center h-full text-center animate-in fade-in zoom-in duration-300">
+//       <div className="p-4 bg-gray-100 dark:bg-gray-800/50 rounded-full mb-4 text-gray-400">
+//         {icon}
+//       </div>
+//       <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{title}</h2>
+//       <p className="text-gray-500 dark:text-gray-400">This page is currently under construction.</p>
+//     </div>
+//   );
+// }
