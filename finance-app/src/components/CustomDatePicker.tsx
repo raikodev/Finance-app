@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppStore } from '../store/useAppStore';
 
 interface CustomDatePickerProps {
   value: string;
@@ -8,143 +9,199 @@ interface CustomDatePickerProps {
   placeholder?: string;
 }
 
-export default function CustomDatePicker({ value, onChange, placeholder = "Select date" }: CustomDatePickerProps) {
+// 1. УНИВЕРСАЛЬНЫЙ ХУК (Конец дублированию кода)
+function useClickOutside(ref: React.RefObject<any>, handler: () => void) {
+  useEffect(() => {
+    const listener = (event: MouseEvent | TouchEvent) => {
+      if (!ref.current || ref.current.contains(event.target as Node)) return;
+      handler();
+    };
+    document.addEventListener('mousedown', listener);
+    document.addEventListener('touchstart', listener);
+    return () => {
+      document.removeEventListener('mousedown', listener);
+      document.removeEventListener('touchstart', listener);
+    };
+  }, [ref, handler]);
+}
+
+export default function CustomDatePicker({ value, onChange, placeholder }: CustomDatePickerProps) {
+  const lang = useAppStore(s => s.lang);
   const [isOpen, setIsOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(() => value ? new Date(value) : new Date());
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  useClickOutside(popoverRef, () => setIsOpen(false));
 
+  // 2. БЕЗОПАСНЫЙ ПАРСИНГ ДАТЫ
+  const selectedDate = useMemo(() => {
+    if (!value) return null;
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }, [value]);
+
+  const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
+
+  // Синхронизация при внешнем изменении
+  useEffect(() => {
+    if (selectedDate) setViewDate(selectedDate);
+  }, [selectedDate]);
+
+  // 3. АБСОЛЮТНАЯ ЛОКАЛИЗАЦИЯ (Без хардкода массивов)
+  const locale = lang === 'ru' ? 'ru-RU' : lang === 'pl' ? 'pl-PL' : 'en-US';
+  
+  const displayValue = selectedDate
+    ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(selectedDate)
+    : placeholder || (lang === 'ru' ? 'Выберите дату' : lang === 'pl' ? 'Wybierz datę' : 'Select date');
+
+  // Динамические дни недели (начиная с понедельника. 1 января 2024 был понедельником)
+  const daysOfWeek = useMemo(() => 
+    Array.from({ length: 7 }).map((_, i) => 
+      new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(new Date(2024, 0, i + 1))
+    ), [locale]
+  );
+
+  // Динамические месяцы
+  const months = useMemo(() => 
+    Array.from({ length: 12 }).map((_, i) => 
+      new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(2024, i, 1))
+    ), [locale]
+  );
+
+  // Логика календаря
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
-  const today = new Date();
+  const currentYear = new Date().getFullYear();
 
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();
-  const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Сдвиг на понедельник
 
-  const days = [];
-  const prevMonthDays = new Date(year, month, 0).getDate();
-  
-  for (let i = startDay - 1; i >= 0; i--) {
-    days.push({ day: prevMonthDays - i, isCurrentMonth: false, monthOffset: -1 });
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push({ day: i, isCurrentMonth: true, monthOffset: 0 });
-  }
-  const remaining = 42 - days.length;
-  for (let i = 1; i <= remaining; i++) {
-    days.push({ day: i, isCurrentMonth: false, monthOffset: 1 });
-  }
+  const days: (Date | null)[] = [];
+  for (let i = 0; i < startDay; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
 
-  const handlePrevMonth = (e: React.MouseEvent) => { e.stopPropagation(); setViewDate(new Date(year, month - 1, 1)); };
-  const handleNextMonth = (e: React.MouseEvent) => { e.stopPropagation(); setViewDate(new Date(year, month + 1, 1)); };
+  // 4. ИЗБАВИЛИСЬ ОТ МАГИЧЕСКОГО ЧИСЛА 42 (Динамическая сетка)
+  const totalCells = Math.ceil(days.length / 7) * 7;
+  const trailingDays = totalCells - days.length;
 
-  const handleSelectDay = (day: number, offset: number) => {
-    const selected = new Date(year, month + offset, day);
-    const formatted = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`;
-    onChange(formatted);
+  const handleSelect = (date: Date) => {
+    // 5. РЕШЕНИЕ ПРОБЛЕМЫ ЧАСОВЫХ ПОЯСОВ
+    // Формируем ISO строку со временем 12:00:00 (Полдень).
+    // Это гарантирует, что дата не перескочит на вчера/завтра при сдвигах UTC -11/+12
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    onChange(`${y}-${m}-${d}T12:00:00.000Z`);
     setIsOpen(false);
   };
 
-  const displayValue = value ? new Date(value).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : placeholder;
+  // Мемоизируем сегодняшний день, чтобы не пересчитывать при каждом клике
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
 
   return (
-    <div className="relative w-full" ref={popoverRef}>
-      {/* КНОПКА (Инпут) */}
-      <button 
+    <div className="relative w-full sm:w-[220px]" ref={popoverRef}>
+      <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between w-full border rounded-md px-3 py-1.5 text-[13px] transition-all outline-none shadow-sm ${
-          isOpen 
-            ? 'border-indigo-500/50 ring-1 ring-indigo-500/50 bg-white dark:bg-[#121214]' 
-            : 'bg-white dark:bg-[#121214] border-gray-200 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.1] hover:bg-gray-50 dark:hover:bg-white/[0.02]'
-        }`}
+        className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 rounded-xl text-sm font-medium hover:border-orange-500/50 dark:hover:border-orange-500/50 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
       >
-        <span className={`font-medium ${value ? 'text-gray-900 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+        <span className={selectedDate ? 'text-gray-900 dark:text-white' : 'text-gray-500'}>
           {displayValue}
         </span>
-        <CalendarIcon size={14} className={isOpen ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'} />
+        <CalendarIcon size={16} className="text-gray-400" />
       </button>
 
-      {/* ВЫПАДАЮЩИЙ КАЛЕНДАРЬ */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -4, scale: 0.98 }} 
-            animate={{ opacity: 1, y: 0, scale: 1 }} 
-            exit={{ opacity: 0, y: -4, scale: 0.98 }} 
-            transition={{ duration: 0.15 }}
-            className="absolute top-full mt-1.5 left-0 w-[260px] bg-white/95 dark:bg-[#1a1a24]/95 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-xl shadow-xl dark:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] z-[100] p-3"
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute top-full mt-2 left-0 sm:right-0 sm:left-auto w-[280px] bg-white/95 dark:bg-[#1a1a24]/95 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] z-50 p-4 overflow-hidden"
           >
-            {/* Тонкий блик */}
-            <div className="absolute inset-0 rounded-xl pointer-events-none border border-black/[0.02] dark:border-white/[0.02]" />
-
-            {/* ШАПКА КАЛЕНДАРЯ */}
-            <div className="flex justify-between items-center mb-3 relative z-10">
-              <h4 className="text-[13px] font-semibold text-gray-900 dark:text-white tracking-tight pl-1">
-                {monthNames[month]} {year}
-              </h4>
-              <div className="flex gap-1">
-                <button type="button" onClick={handlePrevMonth} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors outline-none focus-visible:ring-1 focus-visible:ring-indigo-500">
-                  <ChevronLeft size={14} />
-                </button>
-                <button type="button" onClick={handleNextMonth} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors outline-none focus-visible:ring-1 focus-visible:ring-indigo-500">
-                  <ChevronRight size={14} />
-                </button>
+            {/* 6. БЫСТРАЯ НАВИГАЦИЯ (Появился выбор Года и Месяца!) */}
+            <div className="flex justify-between items-center mb-4 px-1">
+              <button 
+                onClick={() => setViewDate(new Date(year, month - 1, 1))} 
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              
+              <div className="flex gap-1 font-bold text-sm text-gray-900 dark:text-white">
+                <select 
+                  value={month} 
+                  onChange={(e) => setViewDate(new Date(year, Number(e.target.value), 1))}
+                  className="bg-transparent appearance-none cursor-pointer hover:text-orange-500 outline-none capitalize"
+                >
+                  {months.map((m, i) => <option key={i} value={i} className="bg-white dark:bg-[#1a1a24] text-gray-900 dark:text-white">{m}</option>)}
+                </select>
+                <select 
+                  value={year} 
+                  onChange={(e) => setViewDate(new Date(Number(e.target.value), month, 1))}
+                  className="bg-transparent appearance-none cursor-pointer hover:text-orange-500 outline-none"
+                >
+                  {/* Горизонт планирования: от 10 лет назад до 5 лет вперед */}
+                  {Array.from({ length: 16 }, (_, i) => currentYear - 10 + i).map(y => (
+                    <option key={y} value={y} className="bg-white dark:bg-[#1a1a24] text-gray-900 dark:text-white">{y}</option>
+                  ))}
+                </select>
               </div>
+
+              <button 
+                onClick={() => setViewDate(new Date(year, month + 1, 1))} 
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
 
-            {/* ДНИ НЕДЕЛИ */}
-            <div className="grid grid-cols-7 mb-1 relative z-10">
-              {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
-                <div key={d} className="text-center text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider pb-2">
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {daysOfWeek.map((d, i) => (
+                <div key={i} className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                   {d}
                 </div>
               ))}
             </div>
 
-            {/* СЕТКА ДНЕЙ */}
-            <div className="grid grid-cols-7 gap-y-1 relative z-10">
-              {days.map((d, idx) => {
-                const currentDateObj = new Date(year, month + d.monthOffset, d.day);
-                const currentDateStr = `${currentDateObj.getFullYear()}-${String(currentDateObj.getMonth() + 1).padStart(2, '0')}-${String(currentDateObj.getDate()).padStart(2, '0')}`;
+            <div className="grid grid-cols-7 gap-1">
+              {days.map((date, i) => {
+                if (!date) return <div key={`empty-${i}`} />;
                 
-                const isSelected = value === currentDateStr;
-                const isToday = today.getFullYear() === currentDateObj.getFullYear() && 
-                                today.getMonth() === currentDateObj.getMonth() && 
-                                today.getDate() === currentDateObj.getDate();
+                const isSelected = selectedDate?.getDate() === date.getDate() &&
+                                   selectedDate?.getMonth() === date.getMonth() &&
+                                   selectedDate?.getFullYear() === date.getFullYear();
+                                   
+                const isToday = date.getTime() === today;
 
                 return (
-                  <div key={idx} className="flex justify-center items-center h-8">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectDay(d.day, d.monthOffset)}
-                      className={`w-7 h-7 flex items-center justify-center rounded-full text-[12px] transition-all outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
-                        ${isSelected 
-                          ? 'bg-indigo-500 text-white font-semibold shadow-[0_2px_8px_rgba(99,102,241,0.4)]' 
-                          : d.isCurrentMonth 
-                            ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 font-medium' 
-                            : 'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 font-medium'
-                        }
-                        ${isToday && !isSelected ? 'ring-1 ring-gray-200 dark:ring-white/20 text-indigo-600 dark:text-indigo-300' : ''}
-                      `}
-                    >
-                      {d.day}
-                    </button>
-                  </div>
+                  <button
+                    key={i}
+                    onClick={() => handleSelect(date)}
+                    className={`
+                      h-8 rounded-lg text-xs font-medium flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500
+                      ${isSelected 
+                        ? 'bg-orange-600 text-white shadow-md shadow-orange-500/25' 
+                        // 7. ЧИСТЫЙ БРЕНД (Индиго уничтожен навсегда)
+                        : isToday 
+                          ? 'ring-1 ring-inset ring-orange-200 dark:ring-orange-500/30 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10' 
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'
+                      }
+                    `}
+                  >
+                    {date.getDate()}
+                  </button>
                 );
               })}
+              {/* Заполняем пустые клетки в конце месяца */}
+              {Array.from({ length: trailingDays }).map((_, i) => (
+                <div key={`trail-${i}`} />
+              ))}
             </div>
           </motion.div>
         )}

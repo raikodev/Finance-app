@@ -1,179 +1,182 @@
-import React, { useState } from 'react';
-import { motion, } from 'framer-motion';
-import { 
-  Search, ArrowUpRight, ArrowDownRight, Trash2, 
-  CreditCard, Repeat, CheckCircle2, Clock, Copy, Check
-} from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trash2, TrendingUp, TrendingDown, Clock, SearchX } from 'lucide-react';
+import type { Transaction } from '../store/useTransactionStore';
+import { getCategoryMeta } from '../utils/categories';
+import { useAppStore } from '../store/useAppStore';
 
-interface Transaction {
-  id: string;
-  date: string;
-  description: string;
-  category: string;
-  type: 'Expense' | 'Income';
-  amount: number;
-  currency: string;
-}
+// 1. ЛОКАЛИЗАЦИЯ
+const LIST_T = {
+  en: { 
+    title: 'Recent Transactions', all: 'All', income: 'Income', expense: 'Expense', 
+    empty: 'No transactions found', emptySub: 'Adjust your filters or add a new record.',
+    colTx: 'Transaction', colDate: 'Date & Time', colAmount: 'Amount'
+  },
+  ru: { 
+    title: 'Последние транзакции', all: 'Все', income: 'Доходы', expense: 'Расходы', 
+    empty: 'Транзакции не найдены', emptySub: 'Измените фильтры или добавьте новую запись.',
+    colTx: 'Транзакция', colDate: 'Дата и время', colAmount: 'Сумма'
+  },
+  pl: { 
+    title: 'Ostatnie transakcje', all: 'Wszystkie', income: 'Przychody', expense: 'Wydatki', 
+    empty: 'Brak transakcji', emptySub: 'Zmień filtry lub dodaj nowy wpis.',
+    colTx: 'Transakcja', colDate: 'Data i czas', colAmount: 'Kwota'
+  }
+};
 
 interface TransactionListProps {
   transactions: Transaction[];
   onDelete: (id: string) => void;
   formatAmount: (amount: number, currency: string) => string;
-  t: any;
+  t?: any; // Оставляем для обратной совместимости пропсов из Dashboard
 }
 
 export default function TransactionList({ transactions, onDelete, formatAmount }: TransactionListProps) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const lang = useAppStore(s => s.lang);
+  const t = LIST_T[lang];
 
-  const handleCopy = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  // 2. РАБОЧИЕ ФИЛЬТРЫ 
+  const [activeTab, setActiveTab] = useState<'all' | 'income' | 'expense'>('all');
+
+  const filteredTransactions = transactions.filter(tx => {
+    if (activeTab === 'all') return true;
+    return tx.type === activeTab;
+  });
+
+  // 3. ПРАВИЛЬНОЕ ФОРМАТИРОВАНИЕ ДАТЫ
+  const formatDate = (isoString: string) => {
+    const date = new Date(isoString);
+    const locale = lang === 'ru' ? 'ru-RU' : lang === 'pl' ? 'pl-PL' : 'en-US';
+    return {
+      date: date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }),
+      time: date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+    };
   };
 
   return (
-    <div className="bg-white dark:bg-[#0c0c0e] border border-gray-200 dark:border-white/[0.06] rounded-xl shadow-sm overflow-hidden transition-colors relative flex flex-col">
-      <div className="absolute inset-0 pointer-events-none border border-black/[0.02] dark:border-white/[0.02] rounded-xl z-10" />
-
-      {/* ШАПКА ТАБЛИЦЫ С УЛУЧШЕННОЙ ИЕРАРХИЕЙ */}
-      <div className="px-5 py-4 border-b border-gray-100 dark:border-white/[0.04] bg-gray-50/50 dark:bg-[#121214]/80 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <h3 className="text-[14px] font-semibold text-gray-900 dark:text-white tracking-tight">
-            Transactions
-          </h3>
-          <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-200/50 dark:bg-white/5 px-2 py-0.5 rounded-md border border-gray-200/50 dark:border-white/5">
-            {transactions.length}
-          </span>
-        </div>
+    <div className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+      
+      {/* Шапка и Фильтры */}
+      <div className="p-4 sm:p-5 border-b border-gray-200 dark:border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 dark:bg-white/[0.02]">
+        <h3 className="font-bold text-gray-900 dark:text-white">{t.title}</h3>
         
-        {/* Фильтры-табы уровня Stripe */}
-        <div className="hidden sm:flex items-center p-0.5 bg-gray-100 dark:bg-[#161618] border border-gray-200 dark:border-white/5 rounded-lg">
-          <button className="px-3 py-1 text-[11px] font-semibold bg-white dark:bg-[#222226] text-gray-900 dark:text-white rounded-md shadow-sm border border-gray-200 dark:border-white/10 transition-all">All</button>
-          <button className="px-3 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all">Completed</button>
-          <button className="px-3 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all">Pending</button>
+        {/* Интерактивные табы */}
+        <div className="flex bg-gray-200 dark:bg-[#0A0A0C] p-1 rounded-lg border border-transparent dark:border-white/5">
+          {(['all', 'income', 'expense'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                activeTab === tab
+                  ? 'bg-white dark:bg-[#1A1A1D] text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              {t[tab]}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ЗАГОЛОВКИ КОЛОНОК (Решают проблему пустого пространства на Desktop) */}
-      {transactions.length > 0 && (
-        <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-2.5 bg-gray-50/30 dark:bg-white/[0.01] border-b border-gray-100 dark:border-white/[0.04] text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-          <div className="col-span-5 lg:col-span-4">Transaction</div>
-          <div className="col-span-3 lg:col-span-4">Details</div>
-          <div className="col-span-4 text-right">Amount</div>
+      {/* Заголовки колонок (Только для Десктопа) */}
+      {filteredTransactions.length > 0 && (
+        <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-[#0A0A0C]/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="col-span-5">{t.colTx}</div>
+          <div className="col-span-4">{t.colDate}</div>
+          <div className="col-span-3 text-right">{t.colAmount}</div>
         </div>
       )}
 
-      {/* СПИСОК ТРАНЗАКЦИЙ */}
-      <div className="flex flex-col flex-1 divide-y divide-gray-100 dark:divide-white/[0.04] overflow-x-auto">
-        {transactions.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 px-5 text-center">
-            <div className="w-12 h-12 bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] rounded-full flex items-center justify-center mb-4 shadow-sm">
-              <Search className="text-gray-400 dark:text-gray-500" size={20} strokeWidth={1.5} />
-            </div>
-            <h4 className="text-[14px] font-semibold text-gray-900 dark:text-white tracking-tight mb-1">
-              No transactions found
-            </h4>
-            <p className="text-[13px] text-gray-500 dark:text-gray-400 max-w-[250px]">
-              We couldn't find any records matching your current filters or search query.
-            </p>
-          </motion.div>
-        ) : (
-          transactions.map((tx, idx) => {
-            const isIncome = tx.type === 'Income';
-            const Icon = isIncome ? ArrowDownRight : ArrowUpRight;
-            
-            // Симуляция метаданных для реализма (в реальном приложении это приходит с бекенда)
-            const isRecurring = ['Housing', 'Software', 'Subscriptions'].includes(tx.category);
-            const isPending = new Date(tx.date).getTime() > Date.now() - 43200000; // < 12 часов назад
-            const paymentMethod = isIncome ? 'Bank Transfer' : '•••• 4242';
+      {/* Список транзакций */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-3 space-y-1">
+        <AnimatePresence mode="popLayout">
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map((tx) => {
+              const meta = getCategoryMeta(tx.category);
+              const isIncome = tx.type === 'income';
+              const dateTime = formatDate(tx.date);
+              
 
-            return (
-              <motion.div
-                key={tx.id}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: Math.min(idx * 0.03, 0.3) }}
-                className="group flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 sm:px-5 py-3 md:py-3.5 items-start md:items-center hover:bg-gray-50/80 dark:hover:bg-white/[0.015] transition-colors relative cursor-default"
-              >
-                {/* 1 КОЛОНКА: ИКОНКА И ОПИСАНИЕ (span 5/4) */}
-                <div className="col-span-5 lg:col-span-4 flex items-center gap-3.5 min-w-0 w-full">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border border-black/5 dark:border-white/5 shadow-sm transition-colors ${
-                    isIncome ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300'
-                  }`}>
-                    <Icon size={16} strokeWidth={2.5} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight truncate">
-                        {tx.description}
-                      </h4>
-                      {isRecurring && (
-                        <Repeat size={12} className="text-gray-400 shrink-0" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-[12px] text-gray-500">
-                      <span className="truncate">{new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                      <span className="w-0.5 h-0.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0"></span>
-                      <span className="truncate">{tx.category}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2 КОЛОНКА: ДЕТАЛИ И СТАТУС (span 3/4) - Скрыто на мобильных */}
-                <div className="hidden md:flex col-span-3 lg:col-span-4 flex-col gap-1 min-w-0">
-                  <div className="flex items-center gap-1.5 text-[12px] text-gray-600 dark:text-gray-400">
-                    <CreditCard size={13} className="opacity-70" />
-                    <span className="truncate font-medium">{paymentMethod}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] font-medium">
-                    {isPending ? (
-                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 px-1.5 py-0.5 rounded">
-                        <Clock size={10} /> Pending
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-gray-500 dark:text-gray-500">
-                        <CheckCircle2 size={10} /> Completed
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3 КОЛОНКА: СУММА И КНОПКИ (span 4) */}
-                <div className="col-span-4 flex items-center justify-between md:justify-end w-full gap-4">
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                  key={tx.id}
+                  className="group grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center p-3 sm:p-4 bg-white dark:bg-[#121214] hover:bg-gray-50 dark:hover:bg-white/[0.02] rounded-xl border border-transparent hover:border-gray-100 dark:hover:border-white/5 transition-all"
+                >
                   
-                  {/* Кнопки действий (Появляются при наведении) */}
-                  <div className="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <button 
-                      onClick={(e) => handleCopy(tx.id, e)}
-                      className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/10 rounded-md transition-all outline-none"
-                      title="Copy ID"
-                    >
-                      {copiedId === tx.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                    </button>
-                    <button 
+                  {/* КОЛОНКА 1: Иконка, Название, Категория */}
+                  <div className="col-span-1 md:col-span-5 flex items-center gap-3 sm:gap-4 overflow-hidden">
+                    
+                    {/* ЕДИНСТВЕННЫЙ КВАДРАТ С ИКОНКОЙ */}
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 border border-gray-100 dark:border-white/5 ${meta.bg} bg-opacity-10 dark:bg-opacity-10`}>
+                      {(() => {
+                        const Icon = meta.icon;
+                        return Icon ? <Icon size={20} className={meta.color} /> : null;
+                      })()}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                        {tx.description}
+                      </p>
+                      <p className="text-xs font-medium text-gray-500 truncate mt-0.5">
+                        {tx.category}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* КОЛОНКА 2: Дата и Время (Desktop: Grid, Mobile: Flex row) */}
+                  <div className="col-span-1 md:col-span-4 flex items-center gap-2 text-gray-500 md:text-sm text-xs md:mt-0 mt-1">
+                    <Clock size={14} className="shrink-0" />
+                    <span className="truncate">{dateTime.date} • {dateTime.time}</span>
+                  </div>
+
+                  {/* КОЛОНКА 3: Сумма и Действия */}
+                  <div className="col-span-1 md:col-span-3 flex items-center justify-between md:justify-end gap-4 mt-2 md:mt-0">
+                    <div className="flex items-center gap-2">
+                      {isIncome ? (
+                        <TrendingUp size={14} className="text-emerald-500" />
+                      ) : (
+                        <TrendingDown size={14} className="text-gray-400" />
+                      )}
+                      
+                      <span className={`text-sm sm:text-base font-bold whitespace-nowrap ${
+                        isIncome ? 'text-emerald-500' : 'text-gray-900 dark:text-white'
+                      }`}>
+                        {isIncome ? '+' : '-'}{formatAmount(tx.amount, tx.currency)}
+                      </span>
+                    </div>
+
+                    <button
                       onClick={() => onDelete(tx.id)}
-                      className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-md transition-all outline-none"
-                      title="Delete"
+                      title="Delete transaction"
+                      className="p-2 md:opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
 
-                  {/* Сумма (Строгий табличный шрифт) */}
-                  <div className="text-right shrink-0">
-                    <p className={`text-[14px] font-semibold tabular-nums tracking-tight ${
-                      isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-950 dark:text-white'
-                    }`}>
-                      {isIncome ? '+' : '-'}{formatAmount(tx.amount, tx.currency)}
-                    </p>
-                  </div>
-                </div>
-
-              </motion.div>
-            );
-          })
-        )}
+                </motion.div>
+              );
+            })
+          ) : (
+            /* ПУСТОЕ СОСТОЯНИЕ */
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              className="flex flex-col items-center justify-center py-16 px-4 text-center"
+            >
+              <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 border border-gray-100 dark:border-white/5">
+                <SearchX size={28} className="text-gray-400" />
+              </div>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">{t.empty}</h3>
+              <p className="text-xs text-gray-500">{t.emptySub}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

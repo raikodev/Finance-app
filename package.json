@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@studio-freight/lenis": "^1.0.42",
     "react-router-dom": "^7.15.1",
     "zustand": "^5.0.13"
   }

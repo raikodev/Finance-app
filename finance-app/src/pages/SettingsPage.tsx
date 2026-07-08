@@ -1,247 +1,251 @@
 import { useState } from 'react';
-import { motion, type Variants } from 'framer-motion';
-import { 
-  Globe, Moon, Sun, Download, Trash2, 
-  Bell, Shield, Mail, CreditCard 
-} from 'lucide-react';
-
-import { useAppStore } from '../store/useAppStore';
+import { motion } from 'framer-motion';
+import { Globe, Moon, Sun, Download, Trash2, Bell, Shield, Mail, CreditCard, LogOut } from 'lucide-react';
+import { useAppStore, type AppLanguage, type AppCurrency } from '../store/useAppStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { downloadCSV } from '../utils/export';
+import toast from 'react-hot-toast'; // Или ваша библиотека уведомлений
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-};
+// 1. ВЫНОС КОМПОНЕНТА SWITCH ИЗ ТЕЛА СТРАНИЦЫ
+const Switch = ({ checked, onChange, disabled = false }: { checked: boolean, onChange: () => void, disabled?: boolean }) => (
+  <button
+    role="switch"
+    aria-checked={checked}
+    onClick={onChange}
+    disabled={disabled}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+      checked ? 'bg-orange-600' : 'bg-gray-200 dark:bg-white/10'
+    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+  >
+    <span
+      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+        checked ? 'translate-x-6' : 'translate-x-1'
+      }`}
+    />
+  </button>
+);
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0, duration: 0.4 } }
-};
+// 2. ВЫНОС ПОВТОРЯЮЩИХСЯ КЛАССОВ СЕКЦИЙ
+const SectionWrapper = ({ children, title, subtitle }: { children: React.ReactNode, title?: string, subtitle?: string }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm overflow-hidden"
+  >
+    {(title || subtitle) && (
+      <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-white/5">
+        {title && <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>}
+        {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>}
+      </div>
+    )}
+    {children}
+  </motion.div>
+);
 
 export default function SettingsPage() {
-  const { lang, setLang, isDarkMode } = useAppStore();
-  
-  // ДОБАВЛЕНО: Достаем транзакции из хранилища, чтобы было что скачивать!
+  // 3. ПОДКЛЮЧЕНИЕ К РЕАЛЬНЫМ СТОРАМ
+  const { lang, setLang, currency, setCurrency, isDarkMode, toggleTheme } = useAppStore();
+  const { user, logout } = useAuthStore();
   const transactions = useTransactionStore((state) => state.transactions);
-  
-  // В реальном приложении здесь были бы реальные стейты/функции из ваших сторов
-  const [currency, setCurrency] = useState('USD');
+
+  // Локальные настройки (имитация, так как нет бэкенда для их сохранения)
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [monthlyReports, setMonthlyReports] = useState(false);
 
-  // Компонент-переключатель (Toggle)
-  const Switch = ({ checked, onChange }: { checked: boolean, onChange: () => void }) => (
-    <button 
-      type="button"
-      onClick={onChange}
-      className={`w-11 h-6 rounded-full relative transition-colors outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#121214] ${
-        checked ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-white/10'
-      }`}
-    >
-      <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
-        checked ? 'left-6 shadow-sm' : 'left-1'
-      }`} />
-    </button>
-  );
+  // 4. ДИНАМИЧЕСКИЕ ИНИЦИАЛЫ ПРОФИЛЯ
+  const getInitials = (name?: string) => {
+    if (!name) return 'GU';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  // 5. ФУНКЦИОНАЛЬНЫЙ ЭКСПОРТ И УДАЛЕНИЕ
+  const handleExport = () => {
+    const result = downloadCSV(transactions, { delimiter: ',' });
+    if (result.success) toast.success('Export downloaded!');
+    else toast.error(result.message || 'Export failed');
+  };
+
+  const handleDeleteEverything = () => {
+    if (window.confirm("Are you absolutely sure? This will delete all your transactions and chat history. This action cannot be undone.")) {
+      // Имитация полного удаления через логаут (который чистит все сторы)
+      logout();
+      toast.success("All data has been permanently deleted.");
+    }
+  };
 
   return (
-    <div className="w-full max-w-[800px] flex flex-col gap-6 pb-12 mx-auto">
+    <div className="w-full max-w-4xl mx-auto pb-10 space-y-6">
       
-      {/* ШАПКА */}
-      <div className="flex flex-col mt-2 mb-2">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-950 dark:text-white tracking-tight">
-          Settings
-        </h1>
-        <p className="text-[14px] text-gray-500 dark:text-gray-400 mt-1">
-          Manage your account preferences and app settings.
-        </p>
-      </div>
+      {/* 6. РЕАЛЬНЫЙ ПРОФИЛЬ */}
+      <SectionWrapper>
+        <div className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-500 to-purple-500 flex items-center justify-center text-white text-xl font-bold shadow-sm shrink-0">
+              {getInitials(user?.name)}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white capitalize">
+                {user?.name || 'Guest User'}
+              </h3>
+              <p className="text-gray-500 text-sm mt-0.5">
+                {user?.role === 'guest' ? 'Temporary Session' : user?.email}
+              </p>
+              <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">
+                {user?.role === 'guest' ? 'Guest' : 'Pro Member'}
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={logout}
+            className="px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <LogOut size={16} />
+            Sign Out
+          </button>
+        </div>
+      </SectionWrapper>
 
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-6">
-        
-        {/* 1. ПРОФИЛЬ */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-5 sm:p-6 flex items-center justify-between">
+      {/* 7. ИСПРАВЛЕННЫЕ ПРЕФЕРЕНСЫ (СИНХРОНИЗАЦИЯ СО СТОРОМ) */}
+      <SectionWrapper title="Preferences" subtitle="Customize your app experience">
+        <div className="divide-y divide-gray-100 dark:divide-white/5">
+          
+          <div className="p-4 sm:p-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xl font-bold shadow-inner">
-                IL
+              <div className="p-2.5 bg-gray-100 dark:bg-white/5 rounded-xl text-gray-500">
+                <Globe size={20} />
               </div>
               <div>
-                <h3 className="text-[16px] font-bold text-gray-900 dark:text-white">Ilyar</h3>
-                <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-0.5">ilyar@example.com</p>
+                <p className="font-medium text-gray-900 dark:text-white">Language</p>
+                <p className="text-sm text-gray-500">App interface language</p>
               </div>
             </div>
-            <button className="px-4 py-2 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-900 dark:text-white text-[13px] font-medium rounded-lg border border-gray-200 dark:border-white/10 transition-colors shadow-sm">
-              Edit Profile
+            {/* Добавлен польский язык и исправлены option */}
+            <select
+              aria-label="Language"
+              value={lang}
+              onChange={(e) => setLang(e.target.value as AppLanguage)}
+              className="px-3 py-2 bg-gray-50 dark:bg-[#0A0A0C] border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+            >
+              <option value="en">English</option>
+              <option value="pl">Polski</option>
+              <option value="ru">Русский</option>
+            </select>
+          </div>
+
+          <div className="p-4 sm:p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-gray-100 dark:bg-white/5 rounded-xl text-gray-500">
+                <CreditCard size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Default Currency</p>
+                <p className="text-sm text-gray-500">Used for analytics and displays</p>
+              </div>
+            </div>
+            {/* Валюта теперь берется из глобального стора */}
+            <select
+              aria-label="Currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value as AppCurrency)}
+              className="px-3 py-2 bg-gray-50 dark:bg-[#0A0A0C] border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none"
+            >
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="PLN">PLN (zł)</option>
+              <option value="RUB">RUB (₽)</option>
+            </select>
+          </div>
+
+          <div className="p-4 sm:p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-gray-100 dark:bg-white/5 rounded-xl text-gray-500">
+                {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Appearance</p>
+                <p className="text-sm text-gray-500">Switch between light and dark themes</p>
+              </div>
+            </div>
+            {/* Теперь тему можно переключать прямо отсюда! */}
+            <Switch checked={isDarkMode} onChange={toggleTheme} />
+          </div>
+
+        </div>
+      </SectionWrapper>
+
+      {/* Уведомления */}
+      <SectionWrapper title="Notifications">
+        <div className="divide-y divide-gray-100 dark:divide-white/5">
+          <div className="p-4 sm:p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-xl text-orange-600 dark:text-orange-400">
+                <Mail size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Email Alerts</p>
+                <p className="text-sm text-gray-500">Receive alerts for large transactions</p>
+              </div>
+            </div>
+            <Switch checked={emailAlerts} onChange={() => setEmailAlerts(!emailAlerts)} />
+          </div>
+
+          <div className="p-4 sm:p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-xl text-orange-600 dark:text-orange-400">
+                <Bell size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Monthly Reports</p>
+                <p className="text-sm text-gray-500">Get a summary of your spending</p>
+              </div>
+            </div>
+            <Switch checked={monthlyReports} onChange={() => setMonthlyReports(!monthlyReports)} />
+          </div>
+        </div>
+      </SectionWrapper>
+
+      {/* 8. ИСПРАВЛЕННАЯ ДАННЫЕ И ЭКСПОРТ */}
+      <SectionWrapper title="Data & Privacy" subtitle="Manage your financial data">
+        <div className="divide-y divide-gray-100 dark:divide-white/5">
+          <div className="p-4 sm:p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-gray-100 dark:bg-white/5 rounded-xl text-gray-500">
+                <Download size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Export Data</p>
+                <p className="text-sm text-gray-500">Download all your transactions as CSV</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleExport}
+              className="px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-900 dark:text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              Download
             </button>
           </div>
-        </motion.div>
 
-        {/* 2. ПРЕДПОЧТЕНИЯ (Язык, Валюта, Тема) */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-100 dark:border-white/[0.04]">
-            <h3 className="text-[14px] font-bold text-gray-900 dark:text-white">Preferences</h3>
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 rounded-xl text-rose-600">
+                <Shield size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">Danger Zone</p>
+                <p className="text-sm text-gray-500">Permanently delete all your data and account</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleDeleteEverything}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete Everything
+            </button>
           </div>
-          <div className="flex flex-col divide-y divide-gray-100 dark:divide-white/[0.04]">
-            
-            {/* Язык */}
-            <div className="p-5 flex items-center justify-between group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-500">
-                  <Globe size={16} />
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Language</p>
-                  <p className="text-[12px] text-gray-500">Select your preferred interface language</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-              <select 
-                value={lang} 
-                onChange={(e) => setLang(e.target.value as any)}
-                className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-[13px] rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500"
-              >
-                <option value="en" style={{ background: isDarkMode ? '#121214' : '#fff', color: isDarkMode ? '#fff' : '#111827' }}>English</option>
-                <option value="ru" style={{ background: isDarkMode ? '#121214' : '#fff', color: isDarkMode ? '#fff' : '#111827' }}>Русский</option>
-              </select>
-              </div>
-            </div>
-
-            {/* Валюта */}
-            <div className="p-5 flex items-center justify-between group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-500">
-                  <CreditCard size={16} />
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Base Currency</p>
-                  <p className="text-[12px] text-gray-500">Your primary currency for reports</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <select 
-                  value={currency} 
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-[13px] rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500"
-                >
-                  <option value="USD" style={{ background: isDarkMode ? '#121214' : '#fff', color: isDarkMode ? '#fff' : '#111827' }}>USD ($)</option>
-                  <option value="EUR" style={{ background: isDarkMode ? '#121214' : '#fff', color: isDarkMode ? '#fff' : '#111827' }}>EUR (€)</option>
-                  <option value="GBP" style={{ background: isDarkMode ? '#121214' : '#fff', color: isDarkMode ? '#fff' : '#111827' }}>GBP (£)</option>
-                  <option value="PLN" style={{ background: isDarkMode ? '#121214' : '#fff', color: isDarkMode ? '#fff' : '#111827' }}>PLN (zł)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Тема */}
-            <div className="p-5 flex items-center justify-between group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-500">
-                  {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Dark Mode</p>
-                  <p className="text-[12px] text-gray-500">Toggle dark mode appearance (controlled via sidebar)</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-medium text-gray-500 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md border border-gray-200 dark:border-white/10">
-                  {isDarkMode ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-
-          </div>
-        </motion.div>
-
-        {/* 3. УВЕДОМЛЕНИЯ */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-100 dark:border-white/[0.04]">
-            <h3 className="text-[14px] font-bold text-gray-900 dark:text-white">Notifications</h3>
-          </div>
-          <div className="flex flex-col divide-y divide-gray-100 dark:divide-white/[0.04]">
-            
-            <div className="p-5 flex items-center justify-between group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                  <Bell size={16} />
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Push Notifications</p>
-                  <p className="text-[12px] text-gray-500">Receive alerts for big expenses and budget limits</p>
-                </div>
-              </div>
-              <Switch checked={emailAlerts} onChange={() => setEmailAlerts(!emailAlerts)} />
-            </div>
-
-            <div className="p-5 flex items-center justify-between group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                  <Mail size={16} />
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Monthly Reports</p>
-                  <p className="text-[12px] text-gray-500">Send detailed financial reports to your email</p>
-                </div>
-              </div>
-              <Switch checked={monthlyReports} onChange={() => setMonthlyReports(!monthlyReports)} />
-            </div>
-
-          </div>
-        </motion.div>
-
-        {/* 4. ДАННЫЕ И БЕЗОПАСНОСТЬ (DANGER ZONE) */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm overflow-hidden mb-8">
-          <div className="p-5 border-b border-gray-100 dark:border-white/[0.04]">
-            <h3 className="text-[14px] font-bold text-gray-900 dark:text-white">Data & Privacy</h3>
-          </div>
-          <div className="flex flex-col divide-y divide-gray-100 dark:divide-white/[0.04]">
-            
-            {/* Экспорт */}
-            <div className="p-5 flex items-center justify-between group hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500">
-                  <Download size={16} />
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-gray-900 dark:text-white">Export Data</p>
-                  <p className="text-[12px] text-gray-500">Download all your transactions as a CSV file</p>
-                </div>
-              </div>
-              
-              {/* ДОБАВЛЕНО: onClick={() => downloadCSV(transactions)} */}
-              <button 
-                onClick={() => downloadCSV(transactions)} 
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-md transition-colors"
-              >
-                <Download size={14} /> Export CSV
-              </button>
-
-            </div>
-
-            {/* DANGER ZONE */}
-            <div className="p-5 bg-rose-50/30 dark:bg-rose-500/[0.02]">
-              <div className="flex items-start gap-4 p-4 border border-rose-200 dark:border-rose-500/20 bg-rose-50/50 dark:bg-rose-500/5 rounded-xl">
-                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
-                  <Shield size={18} />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-[14px] font-bold text-rose-900 dark:text-rose-400 mb-1">Danger Zone</h4>
-                  <p className="text-[12px] text-rose-700/70 dark:text-rose-400/70 mb-4">
-                    Permanently delete all your transactions, budgets, and settings from this browser. This action cannot be undone.
-                  </p>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold rounded-lg transition-colors shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#121214]">
-                    <Trash2 size={16} />
-                    Delete Everything
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </motion.div>
-
-      </motion.div>
+        </div>
+      </SectionWrapper>
     </div>
   );
 }

@@ -1,100 +1,237 @@
-import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Bot, User, Send } from 'lucide-react';
-
-// Подключаем наши сторы!
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, Bot, Sparkles, Trash2 } from 'lucide-react';
 import { useChatStore } from '../store/useChatStore';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
 
-interface AIAssistantProps {
-  lang: string;
-  t: any;
-}
+// 1. СЛОВАРИ И ПЕРЕВОДЫ (Локализация)
+const DICTIONARY = {
+  en: {
+    placeholder: 'Ask about your finances...',
+    greeting: 'Hello! I am Clarity AI. Ask me about your spending, income, or specific categories like "food" or "transport".',
+    typing: 'Clarity AI is thinking...',
+    clearChat: 'Clear chat',
+    fallback: 'I can analyze your total expenses, income, or specific categories. Try asking: "How much did I spend on food?"',
+    respExpense: 'Your total expenses amount to',
+    respIncome: 'Your total income is',
+    respCategory: 'Your expenses for'
+  },
+  ru: {
+    placeholder: 'Спросите о ваших финансах...',
+    greeting: 'Привет! Я Clarity AI. Спросите меня о расходах, доходах или конкретных категориях, например "еда" или "транспорт".',
+    typing: 'Clarity AI анализирует...',
+    clearChat: 'Очистить чат',
+    fallback: 'Я могу проанализировать ваши расходы, доходы или конкретные категории. Спросите: "Сколько я потратил на еду?"',
+    respExpense: 'Сумма ваших расходов составляет',
+    respIncome: 'Сумма ваших доходов составляет',
+    respCategory: 'Ваши расходы на'
+  },
+  pl: {
+    placeholder: 'Zapytaj o swoje finanse...',
+    greeting: 'Cześć! Jestem Clarity AI. Zapytaj mnie o wydatki, dochody lub konkretne kategorie, np. "jedzenie".',
+    typing: 'Clarity AI myśli...',
+    clearChat: 'Wyczyść czat',
+    fallback: 'Mogę przeanalizować Twoje wydatki, dochody lub kategorie. Zapytaj: "Ile wydałem na jedzenie?"',
+    respExpense: 'Suma Twoich wydatków to',
+    respIncome: 'Suma Twoich dochodów to',
+    respCategory: 'Twoje wydatki na'
+  }
+};
 
-export default function AIAssistant({ lang, t }: AIAssistantProps) {
-  // 1. Берем историю чата из Zustand
-  const { messages, addMessage } = useChatStore();
+export default function AIHub() {
+  const { lang, currency } = useAppStore();
+  const t = DICTIONARY[lang];
+  const transactions = useTransactionStore((state) => state.transactions);
   
-  // 2. Берем транзакции из Zustand для анализа
-  const { transactions: txs } = useTransactionStore();
+  // Подключаем наш новый безопасный стор чата
+  const { messages, addMessage, clearChat, isTyping, setTyping } = useChatStore();
   
-  // 3. Берем валюту из глобального стора
-  const { currency } = useAppStore();
-
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Автоскролл вниз при новых сообщениях
-  useEffect(() => { 
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
-  }, [messages]);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault(); 
-    if(!input.trim()) return;
+  // 2. БЕЗОПАСНОЕ ФОРМАТИРОВАНИЕ ВАЛЮТ
+  const formatMoneySafe = (amount: number) => {
+    try {
+      const locale = lang === 'ru' ? 'ru-RU' : lang === 'pl' ? 'pl-PL' : 'en-US';
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+      }).format(amount);
+    } catch (e) {
+      return `${amount.toFixed(2)} ${currency}`;
+    }
+  };
+
+  // 3. УМНЫЙ ЛОКАЛЬНЫЙ АНАЛИЗАТОР (Вместо бэкенда)
+  const generateAIResponse = (query: string) => {
+    const q = query.toLowerCase();
     
-    // Сохраняем сообщение юзера в СТОР
-    addMessage({ sender: 'user', text: input }); 
-    const query = input.toLowerCase(); 
+    // Безопасный подсчет (используем type, а не amount < 0)
+    const calculateTotal = (type: 'income' | 'expense', categoryStr?: string) => {
+      return transactions
+        .filter(tx => tx.type === type)
+        .filter(tx => categoryStr ? tx.category.toLowerCase().includes(categoryStr) : true)
+        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    };
+
+    // Простые паттерны для локального "ИИ"
+    if (q.includes('expense') || q.includes('расход') || q.includes('wydat')) {
+      return `${t.respExpense} ${formatMoneySafe(calculateTotal('expense'))}.`;
+    }
+    if (q.includes('income') || q.includes('доход') || q.includes('dochod') || q.includes('przych')) {
+      return `${t.respIncome} ${formatMoneySafe(calculateTotal('income'))}.`;
+    }
+    if (q.includes('food') || q.includes('еда') || q.includes('едy') || q.includes('jedzen')) {
+      return `${t.respCategory} "Food": ${formatMoneySafe(calculateTotal('expense', 'food'))}.`;
+    }
+    if (q.includes('transport') || q.includes('транспорт')) {
+      return `${t.respCategory} "Transport": ${formatMoneySafe(calculateTotal('expense', 'transport'))}.`;
+    }
+
+    return t.fallback;
+  };
+
+  // 4. ОТПРАВКА СООБЩЕНИЯ
+  const handleSend = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || isTyping) return;
+
+    const userText = input.trim();
     setInput('');
     
-    // Имитируем запрос к ИИ с небольшой задержкой
-    setTimeout(() => {
-      // Считаем расходы на лету, используя данные из стора txs
-      const exp = Math.abs(txs.filter((t:any)=>t.amount<0).reduce((s:number,t:any)=>s+t.amount,0));
-      const food = Math.abs(txs.filter((t:any)=>t.category==='Food' && t.amount<0).reduce((s:number,t:any)=>s+t.amount,0));
-      
-      let reply = lang === 'ru' ? `Сумма ваших расходов: ${exp.toFixed(2)} ${currency}. Постарайтесь оптимизировать траты!` : 
-                  lang === 'pl' ? `Suma Twoich wydatków: ${exp.toFixed(2)} ${currency}. Postaraj się zoptymalizować koszty!` : 
-                  `Your total expenses amount to ${exp.toFixed(2)} ${currency}. Try to optimize your spending!`;
+    // Пользователь пишет
+    addMessage(userText, 'user');
+    setTyping(true);
 
-      if (query.includes('food') || query.includes('jedzenie') || query.includes('еда') || query.includes('еду')) {
-         reply = lang === 'ru' ? `На категорию "Еда" потрачено ${food.toFixed(2)} ${currency}. Может, стоит чаще готовить дома?` : 
-                 lang === 'pl' ? `Wydałeś ${food.toFixed(2)} ${currency} na "Jedzenie". Może warto gotować w domu?` : 
-                 `You spent ${food.toFixed(2)} ${currency} on Food. Consider cooking at home?`;
-      }
-      
-      // Сохраняем ответ ИИ в СТОР
-      addMessage({ sender: 'ai', text: reply });
-    }, 1000);
+    // Симуляция сетевой задержки (в реальности здесь будет fetch к API)
+    // Задержка динамическая: от 600ms до 1500ms
+    const delay = Math.floor(Math.random() * 900) + 600;
+    
+    setTimeout(() => {
+      const aiReply = generateAIResponse(userText);
+      addMessage(aiReply, 'ai');
+      setTyping(false);
+    }, delay);
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] max-w-4xl mx-auto bg-white dark:bg-[#121216] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800/60 overflow-hidden animate-in fade-in zoom-in duration-300">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a20] flex items-center gap-3">
-         <div className="p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg"><Sparkles size={20} /></div>
-         <div>
-           <h3 className="font-bold text-gray-900 dark:text-white">{t.title}</h3>
-           <p className="text-xs text-gray-500 dark:text-gray-400">{t.sub}</p>
-         </div>
-      </div>
+    <div className="flex flex-col h-[500px] bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden">
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-         {messages.map((m: any, i: number) => (
-            <div key={i} className={`flex items-end gap-2 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {m.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0"><Bot size={16} /></div>}
-              <div className={`px-4 py-3 rounded-2xl max-w-[75%] text-sm shadow-sm ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-gray-50 dark:bg-[#1a1a20] text-gray-800 dark:text-gray-200 rounded-bl-sm border border-gray-100 dark:border-gray-800'}`}>
-                {m.text}
-              </div>
-              {m.sender === 'user' && <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0"><User size={16} /></div>}
+      {/* Шапка чата с кнопкой очистки */}
+      <div className="p-4 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50 dark:bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(255,69,0,0.3)]">
+            <Sparkles className="text-white" size={16} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Clarity AI</h3>
+            <p className="text-[10px] text-gray-500 font-medium">Powered by local engine</p>
+          </div>
+        </div>
+        
+        {messages.length > 0 && (
+          <button 
+            onClick={clearChat}
+            title={t.clearChat}
+            className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
+      </div>
+
+      {/* Зона сообщений */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        
+        {/* Динамическое приветствие (не хранится в localStorage) */}
+        {messages.length === 0 && (
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
+              <Bot size={16} className="text-orange-500" />
             </div>
-         ))}
-         <div ref={messagesEndRef} />
+            <div className="bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 p-3 rounded-2xl rounded-tl-sm text-sm border border-gray-200 dark:border-white/5">
+              {t.greeting}
+            </div>
+          </div>
+        )}
+
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className={`flex items-start gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${
+                msg.sender === 'user' 
+                  ? 'bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10' 
+                  : 'bg-orange-500/10 border-orange-500/20'
+              }`}>
+                {msg.sender === 'user' ? (
+                  <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                ) : (
+                  <Bot size={16} className="text-orange-500" />
+                )}
+              </div>
+              
+              <div className={`p-3 rounded-2xl max-w-[80%] text-sm shadow-sm ${
+                msg.sender === 'user'
+                  // Пользователь: Оранжевый фон
+                  ? 'bg-orange-600 text-white rounded-tr-sm shadow-[0_5px_15px_rgba(255,69,0,0.2)]'
+                  // ИИ: Темный/Светлый фон
+                  : 'bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 rounded-tl-sm border border-gray-200 dark:border-white/5'
+              }`}>
+                {msg.text}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Индикатор набора текста */}
+        {isTyping && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 text-gray-400 text-xs font-medium"
+          >
+            <Bot size={14} className="text-orange-500 animate-pulse" />
+            {t.typing}
+          </motion.div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
-      
-      <form onSubmit={handleSend} className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#121216] flex gap-3">
-        <input 
-          type="text" 
-          value={input} 
-          onChange={e => setInput(e.target.value)} 
-          placeholder={t.type} 
-          className="flex-1 bg-gray-50 dark:bg-[#1a1a20] border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 dark:text-white transition-colors" 
-        />
-        <button type="submit" disabled={!input.trim()} className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl flex items-center gap-2 text-sm font-medium transition-colors">
-          <Send size={16} /> 
-          <span className="hidden sm:inline">{t.send}</span>
-        </button>
-      </form>
+
+      {/* Поле ввода */}
+      <div className="p-4 border-t border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/[0.02]">
+        <form onSubmit={handleSend} className="relative flex items-center">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isTyping}
+            placeholder={t.placeholder}
+            className="w-full bg-white dark:bg-[#1A1A1D] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white pl-4 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all disabled:opacity-50 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isTyping}
+            className="absolute right-2 p-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:hover:bg-orange-600 shadow-[0_0_10px_rgba(255,69,0,0.3)]"
+          >
+            <Send size={16} />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

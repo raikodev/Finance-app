@@ -1,105 +1,80 @@
 @import "tailwindcss";
 
-/* Включаем поддержку темной темы по классу (Tailwind v4) */
+/* 1. АРХИТЕКТУРА: Переменные темы Tailwind v4 */
+@theme {
+  --color-background-dark: #0A0A0C;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
-  /* 1. ПРЕМИАЛЬНАЯ ТИПОГРАФИКА: Включаем сглаживание шрифтов (Mac/Vercel style) */
+  /* 2. ПРЕМИАЛЬНАЯ ТИПОГРАФИКА С ОПТИМИЗАЦИЕЙ ПРОИЗВОДИТЕЛЬНОСТИ */
   body {
-    @apply bg-gray-50 text-gray-900 transition-colors duration-300;
-    text-rendering: optimizeLegibility;
+    @apply bg-gray-50 text-gray-900 transition-colors duration-500;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* optimizeLegibility дорог в рендеринге, применяем только к заголовкам */
+  h1, h2, h3, h4, h5, h6 {
+    text-rendering: optimizeLegibility;
+  }
+
   html.dark body {
-    /* Используем наш фирменный глубокий черный (#0A0A0C) для идеального фона */
-    @apply bg-[#0A0A0C] text-slate-200;
+    @apply bg-background-dark text-slate-200;
   }
 
-  /* 2. БРЕНДОВОЕ ВЫДЕЛЕНИЕ ТЕКСТА (вместо стандартного синего) */
+  /* 3. АДАПТИВНОЕ БРЕНДОВОЕ ВЫДЕЛЕНИЕ ТЕКСТА */
   ::selection {
-    @apply bg-indigo-500/30 text-indigo-200;
+    @apply bg-orange-500/20 text-indigo-900; /* Читаемый контраст для светлой темы */
   }
 
-  /* Firefox скроллбар (глобально) */
+  html.dark ::selection {
+    @apply bg-orange-500/30 text-indigo-100; /* Контраст для темной темы */
+  }
+
+  /* 4. ЕДИНАЯ СИСТЕМА СКРОЛЛБАРОВ (CSS Variables) */
+  :root {
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(156, 163, 175, 0.5);
+    --scrollbar-thumb-hover: rgba(156, 163, 175, 0.8);
+  }
+
+  html.dark {
+    --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+  }
+
+  /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
   }
 }
 
-/* =========================================
-   3. ГЛОБАЛЬНЫЙ СКРОЛЛБАР ДЛЯ CHROME/EDGE
-   (Делает все скроллбары в стиле macOS)
-   ========================================= */
+/* Chrome, Edge, Safari */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent; /* Делаем трек невидимым */
+  background: var(--scrollbar-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5); /* Мягкий серый днем */
+  background-color: var(--scrollbar-thumb);
   border-radius: 10px;
-  border: 2px solid transparent; /* Отступ от краев экрана */
-  background-clip: content-box; /* Чтобы border был прозрачным */
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.8);
+  background-color: var(--scrollbar-thumb-hover);
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.15); /* Полупрозрачный белый ночью */
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.25);
-}
-
-
-/* Ваша кастомная 3D-анимация монетки (без изменений) */
-@keyframes dribbble-coin {
-  0% {
-    transform: perspective(1200px) translateY(0px) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
-    filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.6)) brightness(1);
-  }
-  25% {
-    transform: perspective(1200px) translateY(-15px) rotateX(6deg) rotateY(12deg) rotateZ(1deg);
-    filter: drop-shadow(0 35px 40px rgba(147, 51, 234, 0.25)) brightness(1.1);
-  }
-  50% {
-    transform: perspective(1200px) translateY(-32px) rotateX(-4deg) rotateY(24deg) rotateZ(-1deg);
-    filter: drop-shadow(0 50px 60px rgba(147, 51, 234, 0.4)) brightness(1.25);
-  }
-  75% {
-    transform: perspective(1200px) translateY(-15px) rotateX(-8deg) rotateY(10deg) rotateZ(0deg);
-    filter: drop-shadow(0 35px 40px rgba(147, 51, 234, 0.25)) brightness(1.1);
-  }
-  100% {
-    transform: perspective(1200px) translateY(0px) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
-    filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.6)) brightness(1);
-  }
-}
-
-.animate-dribbble-coin {
-  animation: dribbble-coin 8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-}
-
-@layer utilities {
-  /* 4. ЧИСТЫЕ ИНПУТЫ: Скрываем уродливые системные стрелки (spinners) у полей с цифрами */
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    appearance: none; /* Добавили стандартное свойство */
-    margin: 0;
-  }
-  
-  input[type="number"] {
-    -moz-appearance: textfield; /* Фикс для Firefox */
-  }
-}
+/* Примечание по Accessibility:
+  Мы удалили хак со скрытием стрелок (::-webkit-inner-spin-button) для инпутов.
+  Вместо <input type="number"> используйте <input type="text" inputMode="decimal" pattern="[0-9]*" />
+  Это современный стандарт для финансовых приложений.
+*/

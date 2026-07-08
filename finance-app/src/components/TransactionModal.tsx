@@ -1,199 +1,305 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, X, Bot, Plus, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
+import type { TransactionCategory, TransactionType, Transaction } from '../data/transactions';
+import toast from 'react-hot-toast';
 
-// Interfejs dla transakcji zwracanych przez Gemini
-export interface ExtractedTransaction {
-  id: string;
-  description: string;
-  category: string;
-  type: 'Income' | 'Expense';
-  amount: string;
-  date: string;
-  currency: string; // <--- ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТУ СТРОЧКУ
-}
+// Локальный словарь модалки
+const MODAL_T = {
+  en: { 
+    title: 'Add Transaction', scan: 'AI Receipt Scanner', analyze: 'Clarity AI is analyzing image...', 
+    recognized: 'Recognized Transactions:', addAll: 'Add All to Database', errSize: 'File too large (max 4MB)', 
+    errParse: 'AI failed to parse the receipt.', drag: 'Click or drag image here',
+    disclaimer: 'Development Mode: API key exposed. Move to backend in production!'
+  },
+  ru: { 
+    title: 'Добавить транзакцию', scan: 'ИИ-Сканер чеков', analyze: 'Clarity AI анализирует...', 
+    recognized: 'Распознано:', addAll: 'Добавить все в базу', errSize: 'Файл слишком большой (макс 4MB)', 
+    errParse: 'ИИ не смог распознать чек.', drag: 'Нажмите или перетащите картинку',
+    disclaimer: 'Режим разработки: API ключ на клиенте. Перенесите на бэкенд!'
+  },
+  pl: { 
+    title: 'Dodaj transakcję', scan: 'Skaner paragonów AI', analyze: 'Clarity AI analizuje...', 
+    recognized: 'Rozpoznane transakcje:', addAll: 'Dodaj wszystkie', errSize: 'Plik zbyt duży (max 4MB)', 
+    errParse: 'AI nie mogło przetworzyć obrazu.', drag: 'Kliknij lub przeciągnij zdjęcie',
+    disclaimer: 'Tryb Dev: Klucz API na froncie. Przenieś na backend w produkcji!'
+  }
+};
 
-// Interfejs dla propsów przekazywanych z komponentu Dashboard
+const VALID_CATEGORIES: TransactionCategory[] = ['Food', 'Housing', 'Transport', 'Software', 'Subscriptions', 'Shopping', 'Salary', 'Freelance'];
+
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (txData: any) => void;
-  t: any;
-  currency: string;
-  rates: Record<string, number>;
+  onSave: (tx: Omit<Transaction, 'id'>) => void;
 }
 
-export const TransactionModal = ({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  t, 
-  currency, 
-}: TransactionModalProps) => {
+export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalProps) => {
+  const lang = useAppStore(s => s.lang);
+  const t = MODAL_T[lang];
+  
   const [isScanning, setIsScanning] = useState(false);
-  const [extractedTx, setExtractedTx] = useState<ExtractedTransaction[] | null>(null);
+  const [extractedTxs, setExtractedTxs] = useState<Array<Omit<Transaction, 'id'>>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Konwersja pliku graficznego do formatu Base64
+  // 1. Блокируем скролл заднего фона при открытой модалке
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
-      reader.onerror = error => reject(error);
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = (error) => reject(error);
     });
   };
 
-  // НАСТОЯЩИЙ ИИ-СКАНИРОВЩИК (Обновленная версия с определением валюты)
+  const sanitizeDescription = (text: string) => {
+    return String(text || 'Unknown Transaction').replace(/[<>]/g, '').trim();
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error(t.errSize);
+      return;
+    }
+
     setIsScanning(true);
+    setExtractedTxs([]);
 
     try {
       const base64Image = await fileToBase64(file);
-      const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; 
+      const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-      // ОБНОВЛЕННЫЙ ПРОМПТ: Просим ИИ вытащить валюту (например, PLN, USD, EUR)
+      if (!API_KEY) throw new Error("API Key is missing");
+
+      // Даем ИИ контекст текущего дня
+      const today = new Date().toISOString().split('T')[0];
+
       const promptText = `
-        Analyze this receipt or bank screenshot. Extract a list of transactions.
-        Return ONLY a valid JSON array of objects. Do not use markdown blocks like \`\`\`json.
-        Each object must have exactly these keys:
-        - description: string (Merchant name)
-        - category: string (Choose one: Food, Transport, Housing, Entertainment, Shopping, Freelance, Salary, Other)
-        - type: string (Expense or Income)
-        - amount: string (Just the number, positive, no currency symbols)
-        - date: string (Format YYYY-MM-DD, deduce from image if possible, otherwise use today)
-        - currency: string (Detect currency from image, use 3-letter ISO code like PLN, USD, EUR. If you absolutely cannot find it, return "${currency}")
+        Analyze this receipt or bank screenshot. Extract all transactions.
+        Current date context: ${today}.
+        Return ONLY a raw JSON array of objects without markdown formatting or code blocks.
+        Each object MUST have exact keys:
+        - description: string (Item or merchant name)
+        - amount: number (Absolute POSITIVE float value only)
+        - currency: string (3-letter code, e.g. USD, EUR, PLN)
+        - category: string (MUST BE EXACTLY ONE OF: Food, Housing, Transport, Software, Subscriptions, Shopping, Salary, Freelance)
+        - type: string (MUST BE EXACTLY: 'expense' or 'income')
+        - date: string (Extract date from receipt in YYYY-MM-DD format. If no date is visible, use ${today})
       `;
 
-      // Используем рабочую модель gemini-2.5-flash
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: promptText },
-              { inline_data: { mime_type: file.type, data: base64Image } }
-            ]
-          }]
-        })
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inlineData: { mimeType: file.type, data: base64Image } }
+              ]
+            }]
+          })
+        }
+      );
+
+      if (!response.ok) throw new Error(`API HTTP error: ${response.status}`);
+      
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!rawText) throw new Error("Empty response from AI");
+
+      const cleanJsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      
+      let parsedTx: any;
+      try {
+        parsedTx = JSON.parse(cleanJsonStr);
+      } catch (parseError) {
+        throw new Error(t.errParse);
+      }
+
+      const txArray = Array.isArray(parsedTx) ? parsedTx : [parsedTx];
+
+      const safeTxs = txArray.map((tx: any) => {
+        const rawAmount = parseFloat(String(tx.amount).replace(',', '.'));
+        const safeAmount = isNaN(rawAmount) ? 0 : Math.abs(rawAmount);
+
+        const safeCategory: TransactionCategory = VALID_CATEGORIES.includes(tx.category) 
+          ? tx.category 
+          : (tx.type === 'income' ? 'Salary' : 'Shopping');
+
+        // Парсим дату от ИИ
+        let safeDate = new Date().toISOString();
+        if (tx.date) {
+          const parsedDate = new Date(tx.date);
+          if (!isNaN(parsedDate.getTime())) {
+            safeDate = parsedDate.toISOString();
+          }
+        }
+
+        return {
+          description: sanitizeDescription(tx.description),
+          amount: safeAmount,
+          currency: (tx.currency || 'USD').toUpperCase().substring(0, 3),
+          category: safeCategory,
+          type: (tx.type === 'income' ? 'income' : 'expense') as TransactionType,
+          date: safeDate, 
+        };
       });
 
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
+      setExtractedTxs(safeTxs);
+      toast.success('Successfully scanned!');
 
-      let rawText = data.candidates[0].content.parts[0].text;
-      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      
-      const parsedTx = JSON.parse(rawText);
-
-      // Маппинг транзакций с сохранением валюты и жестким приведением типа для TypeScript (as 'Income' | 'Expense')
-      const newExtracted = (Array.isArray(parsedTx) ? parsedTx : [parsedTx]).map((tx: any) => ({
-        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random(),
-        description: tx.description || 'Unknown',
-        category: tx.category || 'Other',
-        type: (tx.type === 'Income' ? 'Income' : 'Expense') as 'Income' | 'Expense', 
-        amount: String(tx.amount).replace(',', '.'), 
-        date: tx.date || new Date().toISOString().split('T')[0],
-        currency: tx.currency || currency // Сюда запишется PLN, если ИИ его найдет
-      }));
-
-      setExtractedTx(newExtracted);
-
-    } catch (error) {
-      console.error("AI Parsing Error:", error);
-      alert("Failed to parse the image. Please try again or check the console.");
+    } catch (error: any) {
+      toast.error(error.message || t.errParse);
     } finally {
       setIsScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Zapisanie wybranej pozycji do głównej listy w Dashboardzie
-  // Сохранение распознанной транзакции
-  const handleSaveScanned = (tx: ExtractedTransaction) => {
-    // Передаем транзакцию целиком, вместе с той валютой, которую извлек ИИ (например, PLN)
-    onSave(tx); 
-    
-    // Удаляем добавленный элемент из списка распознанных, чтобы строчка исчезла
-    if (extractedTx) {
-      const updatedList = extractedTx.filter(item => item.id !== tx.id);
-      setExtractedTx(updatedList.length > 0 ? updatedList : null);
-    }
+  const handleSaveAll = () => {
+    extractedTxs.forEach(tx => onSave(tx));
+    setExtractedTxs([]);
+    onClose();
+    toast.success('Transactions saved!');
   };
 
-  // Jeśli modal jest zamknięty, nie renderujemy komponentu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity">
-      <div className="bg-white dark:bg-[#121214] w-full max-w-lg rounded-2xl shadow-2xl p-6 relative border border-gray-100 dark:border-white/10">
-        
-        {/* Przycisk zamykania modala */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+    <AnimatePresence>
+      {/* 1. БЛОКИРУЕМ "ПРОТЕКАНИЕ" СКРОЛЛА: Добавляем onWheel и onTouchMove */}
+      <div 
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="bg-[#121214] border border-white/10 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col"
+          style={{ maxHeight: '90vh' }}
         >
-          ✕
-        </button>
+          {/* Header */}
+          <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#0A0A0C] shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/10 rounded-xl">
+                <Bot className="text-orange-500" size={20} />
+              </div>
+              <h2 className="text-xl font-bold text-white">{t.scan}</h2>
+            </div>
+            <button 
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-        <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">
-            {t?.addRecord || "Добавить транзакцию"}
-          </h2>
-          
-          {/* Kontener sekcji skanowania dokumentów */}
-          <div className="mb-6 p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-black/20">
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              ИИ-сканер чеков и скриншотов
-            </label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleFileUpload} 
-              disabled={isScanning}
-              className="block w-full text-sm text-gray-500 dark:text-gray-400
-                file:mr-4 file:py-2 file:px-4 
-                file:rounded-md file:border-0 
-                file:text-sm file:font-semibold 
-                file:bg-indigo-50 file:text-indigo-600 
-                hover:file:bg-indigo-100
-                dark:file:bg-indigo-500/20 dark:file:text-indigo-400
-                cursor-pointer disabled:cursor-not-allowed"
-            />
-            {isScanning && (
-              <p className="mt-3 text-sm text-indigo-500 animate-pulse font-medium">
-                🤖 ИИ анализирует изображение...
-              </p>
+          {/* 2. ЖЕСТКАЯ ВЫСОТА: Вычитаем из 90vh высоту шапки и кнопки (примерно 160px) */}
+          <div 
+            className="p-6 overflow-y-auto custom-scrollbar space-y-6"
+            style={{ maxHeight: 'calc(90vh - 160px)' }}
+          >
+            
+            {/* Warning Banner */}
+            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500 text-xs font-medium">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
+              <p>{t.disclaimer}</p>
+            </div>
+
+            {/* Upload Zone */}
+            <div 
+              onClick={() => !isScanning && fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                isScanning 
+                  ? 'border-orange-500/30 bg-orange-500/5' 
+                  : 'border-white/10 hover:border-orange-500/50 hover:bg-white/5'
+              }`}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileUpload}
+                disabled={isScanning}
+              />
+              {isScanning ? (
+                <>
+                  <Loader2 className="animate-spin text-orange-500 mb-4" size={32} />
+                  <p className="text-sm font-medium text-white">{t.analyze}</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                    <Upload className="text-gray-400" size={24} />
+                  </div>
+                  <p className="text-sm font-medium text-white">{t.drag}</p>
+                  <p className="text-xs text-gray-500 mt-1">JPEG, PNG, WEBP (Max 4MB)</p>
+                </>
+              )}
+            </div>
+
+            {/* Extracted Data Display */}
+            {extractedTxs.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-500" />
+                  {t.recognized}
+                </h3>
+                <div className="space-y-2">
+                  {extractedTxs.map((tx, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-[#0A0A0C] border border-white/5 rounded-xl text-sm">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-white truncate max-w-[200px]">{tx.description}</span>
+                        <span className="text-xs text-gray-500">{tx.category}</span>
+                      </div>
+                      <span className={`font-bold ${tx.type === 'income' ? 'text-emerald-500' : 'text-white'}`}>
+                        {tx.type === 'income' ? '+' : '-'}{tx.amount} {tx.currency}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
             )}
           </div>
 
-          {/* Sekcja wyświetlania rezultatów działania AI */}
-          {extractedTx && extractedTx.length > 0 && (
-            <div className="mt-4 flex flex-col gap-3 max-h-[300px] overflow-y-auto custom-scrollbar">
-              <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300">Распознано:</h3>
-              {extractedTx.map((tx) => (
-                <div key={tx.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/5 flex justify-between items-center gap-2">
-                  <div className="overflow-hidden">
-                    <p className="font-medium text-gray-900 dark:text-white text-sm truncate">{tx.description}</p>
-                    <p className="text-xs text-gray-500">{tx.category} • {tx.date}</p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`font-semibold text-sm ${tx.type === 'Income' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {/* ВОТ ЗДЕСЬ ИСПРАВЛЕНИЕ: tx.currency вместо currency */}
-                      {tx.type === 'Income' ? '+' : '-'}{tx.amount} {tx.currency}
-                    </span>
-                    <button 
-                      onClick={() => handleSaveScanned(tx)}
-                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
-                    >
-                      Добавить
-                    </button>
-                  </div>
-                </div>
-              ))}
+          {/* Footer Action */}
+          {extractedTxs.length > 0 && (
+            <div className="p-4 border-t border-white/10 bg-[#0A0A0C] shrink-0">
+              <button
+                onClick={handleSaveAll}
+                className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(255,69,0,0.3)]"
+              >
+                <Plus size={18} />
+                {t.addAll} ({extractedTxs.length})
+              </button>
             </div>
           )}
-
-        </div>
+        </motion.div>
       </div>
-    );
+    </AnimatePresence>
+  );
 };

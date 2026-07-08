@@ -1,67 +1,103 @@
-import React from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface StatCardProps {
   title: string;
-  value: string;
-  icon: React.ReactNode;
+  value: string | number; // Разрешили и числа, и строки
   trend?: number;
-  trendLabel?: string;
-  color: 'indigo' | 'emerald' | 'rose' | 'blue';
-  inverseTrend?: boolean;
+  icon: ReactNode;
+  color: 'orange' | 'indigo' | 'emerald' | 'rose' | 'blue'; // Строгий список с нашим брендом
   isPrimary?: boolean;
+  inverseTrend?: boolean; // Рост расходов = плохо
 }
 
-export default function StatCard({ 
-  title, value, icon, trend, trendLabel, color, inverseTrend = false, isPrimary = false 
+export default function StatCard({
+  title,
+  value,
+  trend,
+  icon,
+  color,
+  isPrimary = false,
+  inverseTrend = false
 }: StatCardProps) {
   
+  // 1. ЕДИНАЯ ПАЛИТРА ЦВЕТОВ (Без оранжевого текста в синем фоне!)
   const colorMap = {
-    indigo: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20',
-    emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20',
-    rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20',
-    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20',
+    orange: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/20',
+    indigo: 'bg-orange-50 dark:bg-orange-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-orange-500/20',
+    emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20',
+    rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/20',
+    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20',
   };
 
-  const isPositiveTrend = trend !== undefined && trend > 0;
-  const isGood = inverseTrend ? !isPositiveTrend : isPositiveTrend;
-  
-  const trendColor = isGood ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-400/10' : 'text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-400/10';
-  const TrendIcon = isPositiveTrend ? TrendingUp : TrendingDown;
+  // 2. БЕЗОПАСНАЯ И ЛОГИЧНАЯ ОБРАБОТКА ТРЕНДОВ
+  const hasTrend = trend !== undefined && trend !== null;
+  const isPositive = hasTrend && trend > 0;
+  const isNeutral = hasTrend && trend === 0;
+  const isNegative = hasTrend && trend < 0;
 
-  // ЭЛИТНЫЙ SAAS ДИЗАЙН: Никаких неоновых свечений. Только строгие рамки и тонкие тени.
-  const surfaceClasses = isPrimary
-    ? "bg-white dark:bg-[#121214] border-gray-300 dark:border-white/[0.12] shadow-sm ring-1 ring-gray-900/5 dark:ring-white/5"
-    : "bg-white dark:bg-[#0c0c0e] border-gray-200 dark:border-white/[0.06] shadow-sm";
+  // Логика цвета:
+  // Если Neutral -> серый
+  // Если inverseTrend (Расходы): рост = красный, падение = зеленый
+  // Иначе (Доходы): рост = зеленый, падение = красный
+  const isGood = inverseTrend ? isNegative : isPositive;
+  const trendColorClass = isNeutral
+    ? 'text-gray-500 bg-gray-100 dark:bg-white/5 dark:text-gray-400'
+    : isGood
+      ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400'
+      : 'text-rose-600 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400';
 
   return (
-    <div className={`group relative rounded-xl overflow-hidden transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15] outline-none focus-within:ring-2 focus-within:ring-indigo-500/50 ${surfaceClasses}`} tabIndex={0}>
-      <div className="p-4 flex flex-col h-full relative z-10">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`w-8 h-8 rounded-md flex items-center justify-center border transition-colors ${colorMap[color]}`}>
-            {icon}
-          </div>
-
-          {trend !== undefined && (
-            <div className="flex flex-col items-end">
-              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold tabular-nums ${trendColor}`}>
-                <TrendIcon size={12} strokeWidth={3} />
-                <span>{Math.abs(trend)}%</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-auto">
-          <h3 className={`text-[11px] font-bold uppercase tracking-wider mb-1 transition-colors ${isPrimary ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-500'}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className={`relative p-5 rounded-2xl border transition-all duration-300 group ${
+        isPrimary 
+          ? 'bg-gradient-to-br from-white to-orange-50/30 dark:from-[#1A1A1D] dark:to-[#121214] border-orange-200/50 dark:border-orange-500/20 shadow-sm' 
+          : 'bg-white dark:bg-[#121214] border-gray-200 dark:border-white/5 shadow-sm hover:shadow-md'
+      }`}
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
             {title}
-          </h3>
-          {/* TABULAR-NUMS: Цифры больше не будут "прыгать" */}
-          <p className={`font-bold tabular-nums tracking-tight transition-colors ${isPrimary ? 'text-[26px] text-gray-950 dark:text-white' : 'text-2xl text-gray-900 dark:text-gray-100'}`}>
-            {value}
           </p>
+          {/* tabular-nums защищает от "скачущей" ширины символов при изменении баланса */}
+          <h3 className={`font-bold tabular-nums tracking-tight ${isPrimary ? 'text-3xl' : 'text-2xl'} text-gray-900 dark:text-white`}>
+            {value}
+          </h3>
+        </div>
+        
+        {/* Иконка */}
+        <div className={`p-2.5 rounded-xl border ${colorMap[color]} group-hover:scale-110 transition-transform`}>
+          {icon}
         </div>
       </div>
-    </div>
+
+      {/* 3. ЧЕСТНЫЙ БЛОК ТРЕНДА */}
+      {hasTrend && (
+        <div className="flex items-center gap-2 mt-4">
+          <div className={`text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 ${trendColorClass}`}>
+            {isNeutral ? (
+              <Minus size={12} strokeWidth={3} />
+            ) : isPositive ? (
+              <TrendingUp size={12} strokeWidth={3} />
+            ) : (
+              <TrendingDown size={12} strokeWidth={3} />
+            )}
+            
+            <span>
+              {/* Всегда пишем положительное число, знак показывает иконка */}
+              {isNeutral ? '0' : Math.abs(trend).toFixed(1)}%
+            </span>
+          </div>
+          <span className="text-xs font-medium text-gray-400">
+            vs last period
+          </span>
+        </div>
+      )}
+    </motion.div>
   );
 }

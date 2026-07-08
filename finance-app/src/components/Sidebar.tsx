@@ -1,136 +1,240 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowRightLeft, PieChart, Wallet, BarChart3, Settings, Sparkles, Wallet as WalletIcon, Moon } from 'lucide-react';
-import { motion } from 'framer-motion';
-
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  LayoutDashboard, 
+  Receipt, 
+  Layers, 
+  PiggyBank, 
+  BarChart3, 
+  Settings, 
+  Sparkles, 
+  Sun, 
+  Moon, 
+  LogOut, 
+  Hexagon,
+  Menu,
+  X
+} from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { APP_T } from '../locales/translations';
+import { useTranslation } from '../locales/translations';
 
 export default function Sidebar() {
-  const { isDarkMode, lang, toggleTheme } = useAppStore();
-  const { logout } = useAuthStore();
-  const t = APP_T[lang] || APP_T['en'];
+  const lang = useAppStore(s => s.lang);
+  const isDarkMode = useAppStore(s => s.isDarkMode);
+  const toggleTheme = useAppStore(s => s.toggleTheme);
+  
+  // 1. ДИНАМИЧЕСКИЕ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ (Конец хардкоду)
+  const user = useAuthStore(s => s.user);
+  const logout = useAuthStore(s => s.logout);
+  
+  const navigate = useNavigate();
+  const t = useTranslation(lang);
+  
+  // Состояние мобильного меню (для планшетов/телефонов)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const userName = user?.name || 'Guest User';
+  
+  // Вычисляем инициалы динамически
+  const initials = userName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2) || 'GU';
+
+  // 2. СТРУКТУРИРОВАННОЕ МЕНЮ С ПРАВИЛЬНЫМИ ИКОНКАМИ (PiggyBank для бюджетов)
   const menuItems = [
-    { path: '/', name: t.menu.dash, Icon: LayoutDashboard },
-    { path: '/transactions', name: t.menu.tx, Icon: ArrowRightLeft },
-    { path: '/categories', name: t.menu.cat, Icon: PieChart },
-    { path: '/budgets', name: t.menu.bud, Icon: Wallet },
-    { path: '/ai-assistant', name: t.menu.ai, Icon: Sparkles }, 
-    { path: '/reports', name: t.menu.rep, Icon: BarChart3 },
-    { path: '/settings', name: t.menu.set, Icon: Settings },
+    { path: '/dashboard', name: t.menu.dash, icon: LayoutDashboard },
+    { path: '/transactions', name: t.menu.tx, icon: Receipt },
+    { path: '/categories', name: t.menu.cat, icon: Layers },
+    { path: '/budgets', name: t.menu.bud, icon: PiggyBank },
+    { path: '/reports', name: t.menu.rep, icon: BarChart3 },
+    { path: '/ai-assistant', name: t.menu.ai, icon: Sparkles },
+    { path: '/settings', name: t.menu.set, icon: Settings },
   ];
 
+  const handleLogoutClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Предотвращаем клик по карточке профиля
+    if (confirm(lang === 'ru' ? 'Выйти из системы?' : 'Sign out?')) {
+      logout();
+      navigate('/login');
+    }
+  };
+
   return (
-    // 1. Уменьшена ширина (w-56 = 224px вместо 280px). Фон сделан чуть более плотным для читаемости.
-    <aside className="w-56 bg-white dark:bg-[#0c0c0e] border-r border-gray-200 dark:border-white/10 flex flex-col justify-between shrink-0 hidden md:flex z-20">
-      {/* 2. Уменьшены глобальные паддинги (py-5 px-3 вместо py-8 px-5) */}
-      <div className="py-5 px-3">
-        
-        {/* ЛОГОТИП С УТОНЧЕННЫМ GLOW-ЭФФЕКТОМ */}
-        <div className="flex items-center gap-2.5 px-3 mb-8 group cursor-pointer">
-          <div className="relative flex-shrink-0">
-            {/* Свечение сделано более тонким и аккуратным */}
-            <div className="absolute inset-0 bg-indigo-500 blur-[6px] opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
-            {/* Уменьшен паддинг иконки (p-1.5) */}
-            <div className="relative bg-gradient-to-b from-indigo-500 to-indigo-600 p-1.5 rounded-lg text-white border border-indigo-400/30 shadow-sm">
-              <WalletIcon size={18} strokeWidth={2.5} />
+    <>
+      {/* ========================================================================= */}
+      {/* 3. ДЕСКТОПНАЯ НАВИГАЦИЯ (md:flex)                                          */}
+      {/* ========================================================================= */}
+      <aside className="hidden md:flex flex-col w-64 h-screen bg-gray-50 dark:bg-[#0A0A0C] border-r border-gray-200 dark:border-white/5 p-4 justify-between shrink-0">
+        <div className="space-y-6">
+          {/* Логотип бренда Clarity (Уничтожен FinanceApp и Nickel из кода) */}
+          <div className="flex items-center gap-3 px-2 py-1.5">
+            <div className="bg-orange-500 rounded-xl p-2 text-white shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+              <Hexagon size={20} className="fill-white/20 animate-pulse" />
             </div>
+            <span className="text-lg font-black tracking-tight text-gray-900 dark:text-white">
+              Clarity<span className="text-orange-500">.</span>
+            </span>
           </div>
-          {/* Шрифт логотипа уменьшен до text-lg для солидности */}
-          <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 tracking-tight">
-            Finance<span className="text-indigo-500 dark:text-indigo-400">App</span>
-          </span>
+
+          {/* Секция навигации */}
+          <nav className="space-y-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-3 mb-2">
+              {lang === 'ru' ? 'Главное меню' : lang === 'pl' ? 'Menu główne' : 'Main Menu'}
+            </div>
+            
+            <AnimatePresence mode="popLayout">
+              {menuItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group ${
+                      isActive 
+                        ? 'text-orange-600 dark:text-white' 
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {/* Интерактивная пилюля активного пункта на Framer Motion */}
+                      {isActive && (
+                        <motion.div
+                          layoutId="sidebar-active-pill"
+                          className="absolute inset-0 bg-orange-500/10 dark:bg-white/5 border border-orange-500/20 dark:border-white/10 rounded-xl"
+                          transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+                        />
+                      )}
+                      <item.icon size={18} className={`z-10 transition-transform group-hover:scale-110 ${isActive ? 'text-orange-500' : 'text-gray-400'}`} />
+                      <span className="z-10">{item.name}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </AnimatePresence>
+          </nav>
         </div>
 
-        {/* НАВИГАЦИЯ */}
-        {/* gap-1 вместо gap-2 для плотности */}
-        <nav className="flex flex-col gap-1">
-          {/* Более компактный заголовок меню */}
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-3 mb-1.5">
-            Main Menu
-          </div>
-          
-          {/* Итерация по меню */}
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              // Уменьшен вертикальный отступ (py-1.5 вместо py-2.5)
-              className="relative flex items-center px-3 py-1.5 w-full outline-none group rounded-md"
+        {/* Нижняя часть: Переключатель темы и Профиль */}
+        <div className="space-y-4">
+          {/* Интуитивный переключатель темы (Луна в светлой теме, Солнце в тёмной) */}
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/5"
+          >
+            <div className="flex items-center gap-3">
+              {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className="text-orange-500" />}
+              <span>{t.mode}</span>
+            </div>
+          </button>
+
+          {/* Карточка профиля пользователя */}
+          <div 
+            onClick={() => navigate('/settings')}
+            className="flex items-center justify-between p-2.5 bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/5 rounded-2xl cursor-pointer hover:border-orange-500/30 transition-all group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                {initials}
+                {/* Честный онлайн-статус (на Демо всегда зелёный, но теперь аккуратный) */}
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-[#121214] rounded-full"></div>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-gray-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">
+                  {userName}
+                </p>
+                <p className="text-[10px] font-medium text-gray-400 truncate mt-0.5">
+                  {user?.email || 'guest@clarity.ai'}
+                </p>
+              </div>
+            </div>
+            
+            {/* Изолированная кнопка выхода */}
+            <button
+              onClick={handleLogoutClick}
+              title="Sign Out"
+              className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors shrink-0"
             >
-              {({ isActive }) => {
-                const IconComponent = item.Icon;
-                return (
-                  <>
-                    {/* Плавающая подложка (Sliding Background) - стиль Vercel/Linear */}
-                    {isActive && (
-                      <motion.div
-                        layoutId="sidebar-active-pill"
-                        className="absolute inset-0 bg-gray-100 dark:bg-white/10 rounded-md"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                      />
-                    )}
-                    
-                    {/* Контент ссылки */}
-                    <div className="relative z-10 flex items-center gap-2.5 w-full">
-                      <IconComponent 
-                        size={16} // Иконки чуть меньше (16px)
-                        strokeWidth={isActive ? 2.5 : 2}
-                        className={`transition-colors duration-200 ${isActive ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`} 
-                      />
-                      <span className={`text-sm transition-colors duration-200 ${isActive ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-gray-400 group-hover:text-gray-800 dark:group-hover:text-gray-200'}`}>
-                        {item.name}
-                      </span>
-                    </div>
-                  </>
-                );
-              }}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </aside>
 
-      {/* НИЖНЯЯ ПАНЕЛЬ: УПЛОТНЕННАЯ */}
-      {/* p-3 space-y-1 mb-2 для экономии места */}
-      <div className="p-3 space-y-1.5 mb-2">
+      {/* ========================================================================= */}
+      {/* 4. МОБИЛЬНАЯ НАВИГАЦИЯ (Верхний бар + Нижний таб-бар в стиле Revolut)      */}
+      {/* ========================================================================= */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-[#0A0A0C] border-b border-gray-200 dark:border-white/5 px-4 flex items-center justify-between z-40">
+        <div className="flex items-center gap-2">
+          <div className="bg-orange-500 rounded-lg p-1.5 text-white">
+            <Hexagon size={16} />
+          </div>
+          <span className="text-md font-black tracking-tight text-gray-900 dark:text-white">Clarity</span>
+        </div>
         
-        {/* Переключатель темы */}
-        <div 
-          onClick={toggleTheme} 
-          className="flex items-center justify-between px-3 py-2 bg-transparent rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group"
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all"
         >
-          <div className="flex items-center gap-2.5 text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white text-sm font-medium transition-colors">
-            <Moon size={16} strokeWidth={2} /> 
-            <span>{t.mode}</span>
-          </div>
-          {/* Уменьшенный свитчер (как в iOS/macOS настройках) */}
-          <div className={`w-8 h-4.5 rounded-full flex items-center p-0.5 transition-colors duration-300 ${isDarkMode ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
-            <div className={`w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-transform duration-300 ${isDarkMode ? 'translate-x-3.5' : ''}`}></div>
-          </div>
-        </div>
-
-        {/* Профиль пользователя */}
-        <div 
-          onClick={logout} 
-          className="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors group"
-        >
-          <div className="relative">
-            {/* Аватарка чуть меньше (w-8 h-8) */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center text-xs font-bold shadow-inner group-hover:text-rose-600 dark:group-hover:text-rose-400 group-hover:from-rose-100 group-hover:to-rose-200 transition-all border border-white/50 dark:border-white/10">
-              IL
-            </div>
-            {/* Уменьшенный онлайн-индикатор */}
-            <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border-[1.5px] border-white dark:border-[#0c0c0e] rounded-full"></div>
-          </div>
-          <div className="flex-1 min-w-0 flex flex-col leading-tight">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">Ilyar</p>
-            <p className="text-[10px] font-medium text-gray-400 group-hover:text-rose-500/70 transition-colors">Sign Out</p>
-          </div>
-        </div>
-
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
       </div>
-    </aside>
+
+      {/* Мобильное выпадающее меню на Framer Motion */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="md:hidden fixed inset-x-0 top-16 bg-white dark:bg-[#0A0A0C] border-b border-gray-200 dark:border-white/10 z-30 p-4 shadow-xl flex flex-col gap-1 max-h-[calc(100vh-4rem)] overflow-y-auto"
+          >
+            {menuItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                    isActive 
+                      ? 'bg-orange-500/10 text-orange-600 dark:text-white border border-orange-500/20' 
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`
+                }
+              >
+                <item.icon size={18} />
+                <span>item.name</span>
+              </NavLink>
+            ))}
+            
+            <div className="h-px bg-gray-100 dark:bg-white/5 my-2" />
+            
+            <button
+              onClick={() => { toggleTheme(); setIsMobileMenuOpen(false); }}
+              className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-500 dark:text-gray-400"
+            >
+              {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className="text-orange-500" />}
+              <span>{t.mode}</span>
+            </button>
+
+            <button
+              onClick={(e) => { setIsMobileMenuOpen(false); handleLogoutClick(e); }}
+              className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-rose-500"
+            >
+              <LogOut size={18} />
+              <span>{lang === 'ru' ? 'Выйти' : lang === 'pl' ? 'Wyloguj' : 'Sign Out'}</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Отступ под мобильную шапку, чтобы контент страниц не залезал под неё */}
+      <div className="md:hidden h-16 w-full" />
+    </>
   );
 }

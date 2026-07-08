@@ -1,119 +1,127 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Sparkles, Mail, Lock, ArrowRight, Fingerprint, UserCircle } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import { useAppStore } from '../store/useAppStore';
+import toast from 'react-hot-toast';
+
+const PAGE_CONTENT = {
+  en: { welcome: 'Welcome back', subtitle: 'Enter your credentials to access your account', emailLabel: 'Email address', emailPlaceholder: 'name@example.com', passwordLabel: 'Password', passwordPlaceholder: 'Enter your password', forgot: 'Forgot password?', btnContinue: 'Sign In', or: 'Or continue with', btnGoogle: 'Google', btnGuest: 'View as Guest', noSignup: 'Limited access', loading: 'Authenticating...' },
+  ru: { welcome: 'С возвращением', subtitle: 'Введите свои данные для входа в систему', emailLabel: 'Email адрес', emailPlaceholder: 'name@example.com', passwordLabel: 'Пароль', passwordPlaceholder: 'Введите ваш пароль', forgot: 'Забыли пароль?', btnContinue: 'Войти', or: 'Или войдите через', btnGoogle: 'Google', btnGuest: 'Войти как Гость', noSignup: 'Ограниченный доступ', loading: 'Вход...' },
+  pl: { welcome: 'Witaj ponownie', subtitle: 'Wprowadź swoje dane, aby uzyskać dostęp', emailLabel: 'Adres email', emailPlaceholder: 'name@example.com', passwordLabel: 'Hasło', passwordPlaceholder: 'Wprowadź swoje hasło', forgot: 'Zapomniałeś hasła?', btnContinue: 'Zaloguj się', or: 'Lub kontynuuj przez', btnGoogle: 'Google', btnGuest: 'Wejdź jako Gość', noSignup: 'Ograniczony dostęp', loading: 'Logowanie...' }
+};
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { loginWithEmail, loginAsGuest } = useAuthStore();
-  
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [error, setError] = useState('');
+  const { lang } = useAppStore();
+  const t = PAGE_CONTENT[lang];
+  const { loginWithEmail, loginAsGuest, isLoading, error, clearError } = useAuthStore();
+  const [formData, setFormData] = useState({ email: '', password: '' });
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const brandBg = "bg-[#FF4500]";
+  const brandHover = "hover:bg-[#E63E00]";
+  const brandText = "text-[#FF4500]";
+  const brandRing = "focus:ring-[#FF4500]";
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    clearError();
+    if (!formData.email || !formData.password) return toast.error('Please fill in all fields');
+    if (formData.password.length < 6) return toast.error('Password must be at least 6 characters');
 
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      return;
+    const mockName = formData.email.split('@')[0].replace(/[^a-zA-Z]/g, ' ');
+    const capitalizedName = mockName.charAt(0).toUpperCase() + mockName.slice(1);
+
+    try {
+      await loginWithEmail(capitalizedName || 'User', formData.email);
+      toast.success('Successfully logged in!');
+      navigate('/dashboard', { replace: true });
+    } catch (err: any) {
+      toast.error(err.message || 'Authentication failed');
     }
-
-    // Логиним пользователя в состояние Zustand
-    loginWithEmail(formData.name || 'New User', formData.email);
-    
-    // ИСПРАВЛЕНИЕ 1: Меняем '/dashboard' на '/' и добавляем { replace: true }
-    navigate('/', { replace: true });
   };
 
-  const handleGuestLogin = () => {
-    loginAsGuest();
-    // ИСПРАВЛЕНИЕ 2: Тоже меняем путь на '/'
-    navigate('/', { replace: true });
-  };
-
-  const handleGoogleLogin = () => {
-    // Заглушка для будущей интеграции
-    alert('Google Auth is coming soon!');
+  const handleGuestLogin = async () => {
+    try {
+      await loginAsGuest();
+      toast.success('Logged in as Guest');
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      toast.error('Failed to enter guest mode');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4 font-sans">
-      <div className="max-w-md w-full bg-[#111] border border-white/10 rounded-2xl p-8 shadow-2xl">
-        <h2 className="text-3xl font-bold text-white mb-2">Welcome to Nickel</h2>
-        <p className="text-gray-400 mb-8">Choose how you want to continue.</p>
+    <div className="min-h-screen bg-[#050505] flex flex-col justify-center items-center p-4 font-sans selection:bg-[#FF4500]/30">
+      
+      {/* Огненные фоновые свечения */}
+      <div className="fixed top-[-10%] right-[-5%] w-[500px] h-[500px] bg-[#FF4500]/20 rounded-full blur-[150px] pointer-events-none"></div>
 
-        {/* Быстрые способы входа */}
-        <div className="space-y-3 mb-8">
-          <button
-            type="button" // ИСПРАВЛЕНИЕ 3: Явное указание type="button"
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-black font-medium py-3 rounded-lg transition-colors cursor-pointer"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-            Continue with Google
-          </button>
-
-          <button
-            type="button" // ИСПРАВЛЕНИЕ 3: Явное указание type="button"
-            onClick={handleGuestLogin}
-            className="w-full bg-[#2a2a2a] hover:bg-[#333] text-white font-medium py-3 rounded-lg transition-colors border border-white/5 cursor-pointer"
-          >
-            View as Guest (No signup)
-          </button>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="w-full max-w-[420px] relative z-10">
+        
+        <div className="flex flex-col items-center mb-8">
+          <div className={`w-12 h-12 ${brandBg} rounded-xl flex items-center justify-center shadow-[0_0_30px_rgba(255,69,0,0.4)] mb-4`}>
+            <Sparkles className="text-white" size={24} />
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Clarity</h1>
         </div>
 
-        {/* Разделитель */}
-        <div className="relative mb-8">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10"></div>
+        <div className="bg-[#121214] border border-white/10 p-8 rounded-3xl shadow-2xl backdrop-blur-xl">
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-white mb-1">{t.welcome}</h2>
+            <p className="text-sm text-gray-400">{t.subtitle}</p>
           </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-[#111] text-gray-500">Or continue with email</span>
+
+          {error && <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm font-medium text-center">{error}</div>}
+
+          <form onSubmit={handleEmailSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium text-gray-400 pl-1">{t.emailLabel}</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder={t.emailPlaceholder} disabled={isLoading} className={`w-full bg-[#0A0A0C] border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 ${brandRing} focus:border-transparent outline-none transition-all disabled:opacity-50`} required />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center pl-1 pr-1">
+                <label htmlFor="password" className="text-sm font-medium text-gray-400">{t.passwordLabel}</label>
+                <button type="button" onClick={() => toast.success('Recovery email sent')} className={`text-xs font-medium ${brandText} hover:text-white transition-colors`}>{t.forgot}</button>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input id="password" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder={t.passwordPlaceholder} disabled={isLoading} className={`w-full bg-[#0A0A0C] border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 ${brandRing} focus:border-transparent outline-none transition-all disabled:opacity-50`} required />
+              </div>
+            </div>
+
+            <button type="submit" disabled={isLoading || !formData.email || !formData.password} className={`w-full ${brandBg} ${brandHover} text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(255,69,0,0.3)] mt-2`}>
+              {isLoading ? t.loading : t.btnContinue}
+              {!isLoading && <ArrowRight size={18} />}
+            </button>
+          </form>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/10"></div>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{t.or}</span>
+            <div className="flex-1 h-px bg-white/10"></div>
+          </div>
+
+          <div className="space-y-3">
+            <button type="button" onClick={() => toast('OAuth coming soon', { icon: '🛠️' })} disabled={isLoading} className="w-full bg-[#0A0A0C] hover:bg-white/5 border border-white/10 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50">
+              <Fingerprint size={18} className="text-gray-400" />
+              {t.btnGoogle}
+            </button>
+            <button type="button" onClick={handleGuestLogin} disabled={isLoading} className="w-full bg-[#0A0A0C] hover:bg-white/5 border border-white/10 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 group">
+              <UserCircle size={18} className="text-gray-400 group-hover:text-white transition-colors" />
+              <div className="flex flex-col items-start leading-tight">
+                <span>{t.btnGuest}</span>
+                <span className="text-[10px] text-gray-500">{t.noSignup}</span>
+              </div>
+            </button>
           </div>
         </div>
-
-        {/* Ошибки валидации */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 text-red-400 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Форма Email/Пароль */}
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
-          <div>
-            <input
-              type="email"
-              className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
-              placeholder="Email address"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <input
-              type="password"
-              className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
-              placeholder="Password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-[#FF5722] hover:bg-[#FF7043] text-white font-medium py-3 rounded-lg transition-colors mt-2 cursor-pointer"
-          >
-            Continue
-          </button>
-        </form>
-      </div>
+      </motion.div>
     </div>
   );
 }
