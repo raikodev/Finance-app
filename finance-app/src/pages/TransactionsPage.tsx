@@ -4,6 +4,7 @@ import { Search, Filter, Download, Trash2, ArrowUpRight, ArrowDownRight } from '
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
 import { downloadCSV } from '../utils/export';
+import { getMerchantIcon } from '../utils/merchantIcons';
 
 // Используем строчные типы из нашего обновленного стора
 type FilterType = 'all' | 'income' | 'expense';
@@ -194,7 +195,13 @@ export default function TransactionsPage() {
                             ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
                             : 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400'
                         }`}>
-                          {tx.type === 'income' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
+                          {(() => {
+                            // Если удалось определить тип заведения по описанию — показываем
+                            // его иконку, иначе — стрелку по направлению (доход/расход)
+                            const MerchantIcon = getMerchantIcon(tx.description);
+                            if (MerchantIcon) return <MerchantIcon size={20} />;
+                            return tx.type === 'income' ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />;
+                          })()}
                         </div>
                         <div>
                           <p className="font-medium text-gray-900 dark:text-white">{tx.description}</p>

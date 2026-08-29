@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, TrendingUp, TrendingDown, Clock, SearchX } from 'lucide-react';
 import type { Transaction } from '../store/useTransactionStore';
 import { getCategoryMeta } from '../utils/categories';
+import { getMerchantIcon } from '../utils/merchantIcons';
 import { useAppStore } from '../store/useAppStore';
 
 // 1. ЛОКАЛИЗАЦИЯ
@@ -111,9 +112,11 @@ export default function TransactionList({ transactions, onDelete, formatAmount }
                   <div className="col-span-1 md:col-span-5 flex items-center gap-3 sm:gap-4 overflow-hidden">
                     
                     {/* ЕДИНСТВЕННЫЙ КВАДРАТ С ИКОНКОЙ */}
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 border border-gray-100 dark:border-white/5 ${meta.bg} bg-opacity-10 dark:bg-opacity-10`}>
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 border border-gray-100 dark:border-white/5 ${meta.iconBg}`}>
                       {(() => {
-                        const Icon = meta.icon;
+                        // Сначала пробуем определить тип заведения по описанию
+                        // (кофейня/продукты/аптека и т.п.), если не нашли — иконка категории
+                        const Icon = getMerchantIcon(tx.description) || meta.icon;
                         return Icon ? <Icon size={20} className={meta.color} /> : null;
                       })()}
                     </div>
