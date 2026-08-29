@@ -4,6 +4,7 @@ import { Plus, AlertTriangle, Target, TrendingDown } from 'lucide-react';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
 import { getCategoryMeta } from '../utils/categories';
+import { convertAmount } from '../utils/currency';
 import toast from 'react-hot-toast';
 
 // 1. ЛОКАЛИЗАЦИЯ (i18n)
@@ -76,10 +77,11 @@ export default function BudgetsPage() {
     const expenseTransactions = transactions.filter(tx => tx.type === 'expense');
 
     return MOCK_BUDGETS.map(budget => {
-      // Считаем все траты по этой категории
+      // Считаем все траты по этой категории (budget.limit задан в текущей валюте,
+      // поэтому траты в других валютах сначала переводим в неё же)
       const spent = expenseTransactions
         .filter(tx => tx.category === budget.category)
-        .reduce((acc, tx) => acc + Math.abs(tx.amount), 0);
+        .reduce((acc, tx) => acc + convertAmount(Math.abs(tx.amount), tx.currency, currency), 0);
 
       // Математика без ограничения 100% для прогресс-бара (чтобы показать перерасход)
       const rawPercentage = (spent / budget.limit) * 100;
@@ -104,7 +106,7 @@ export default function BudgetsPage() {
         progressColor
       };
     }).sort((a, b) => b.rawPercentage - a.rawPercentage); // Сортируем: сначала самые проблемные
-  }, [transactions]); // Зависит только от данных
+  }, [transactions, currency]); // currency важна: от неё зависит конвертация spent
 
   // Общая статистика
   const summary = useMemo(() => {
@@ -124,7 +126,7 @@ export default function BudgetsPage() {
         </div>
         <button 
           onClick={() => toast.success('Budget creation coming soon!')}
-          className="flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+          className="flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
         >
           <Plus size={16} />
           <span>{t.btnCreate}</span>

@@ -8,6 +8,7 @@ import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { getCategoryMeta } from '../utils/categories';
+import { convertAmount } from '../utils/currency';
 
 // 1. ЛОКАЛИЗАЦИЯ (i18n)
 const PAGE_CONTENT = {
@@ -81,8 +82,10 @@ export default function CategoriesPage() {
     let totalSum = 0;
 
     filtered.forEach(tx => {
-      // Защита: берем сумму по модулю, чтобы отрицательные расходы не ломали математику
-      const amount = Math.abs(tx.amount);
+      // Защита: берем сумму по модулю, чтобы отрицательные расходы не ломали математику,
+      // и переводим в текущую валюту, иначе транзакции в разных валютах сложились бы
+      // как одна и та же сумма
+      const amount = convertAmount(Math.abs(tx.amount), tx.currency, currency);
       if (!stats[tx.category]) {
         stats[tx.category] = { total: 0, count: 0 };
       }
@@ -120,7 +123,7 @@ export default function CategoriesPage() {
         </div>
         <button 
           onClick={handleAddCategory}
-          className="flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+          className="flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
         >
           <Plus size={16} strokeWidth={2.5} />
           <span>{t.btnAdd}</span>

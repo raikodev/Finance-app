@@ -4,6 +4,7 @@ import { Send, Bot, Sparkles, Trash2 } from 'lucide-react';
 import { useChatStore } from '../store/useChatStore';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
+import { convertAmount } from '../utils/currency';
 
 // 1. СЛОВАРИ И ПЕРЕВОДЫ (Локализация)
 const DICTIONARY = {
@@ -76,12 +77,14 @@ export default function AIHub() {
   const generateAIResponse = (query: string) => {
     const q = query.toLowerCase();
     
-    // Безопасный подсчет (используем type, а не amount < 0)
+    // Безопасный подсчет (используем type, а не amount < 0; конвертируем в текущую
+    // валюту перед суммированием, иначе транзакции в разных валютах сложились бы
+    // как одна и та же сумма)
     const calculateTotal = (type: 'income' | 'expense', categoryStr?: string) => {
       return transactions
         .filter(tx => tx.type === type)
         .filter(tx => categoryStr ? tx.category.toLowerCase().includes(categoryStr) : true)
-        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+        .reduce((sum, tx) => sum + convertAmount(Math.abs(tx.amount), tx.currency, currency), 0);
     };
 
     // Простые паттерны для локального "ИИ"
@@ -91,7 +94,7 @@ export default function AIHub() {
     if (q.includes('income') || q.includes('доход') || q.includes('dochod') || q.includes('przych')) {
       return `${t.respIncome} ${formatMoneySafe(calculateTotal('income'))}.`;
     }
-    if (q.includes('food') || q.includes('еда') || q.includes('едy') || q.includes('jedzen')) {
+    if (q.includes('food') || q.includes('еда') || q.includes('еды') || q.includes('jedzen')) {
       return `${t.respCategory} "Food": ${formatMoneySafe(calculateTotal('expense', 'food'))}.`;
     }
     if (q.includes('transport') || q.includes('транспорт')) {

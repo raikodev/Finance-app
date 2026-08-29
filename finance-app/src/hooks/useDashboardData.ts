@@ -3,16 +3,15 @@ import { useAppStore } from '../store/useAppStore';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useTranslation } from '../locales/translations';
 import { getCategoryMeta } from '../utils/categories';
+import { MOCK_RATES, convertAmount as sharedConvertAmount } from '../utils/currency';
+import { calculateTrend as calculateTrendResult } from '../utils/math';
 
-// В реальном приложении это приходит из API (например, ExchangeRate-API)
-const MOCK_RATES: Record<string, number> = {
-  USD: 1, EUR: 0.92, GBP: 0.79, PLN: 4.01, RUB: 92.5, UAH: 39.5
-};
-
-// Вынесли функцию трендов, чтобы не засорять хук
+// Тонкая обёртка вокруг общей calculateTrend (utils/math.ts): здесь нужен просто
+// процент числом для StatCard, а не весь TrendResult — семантику "хорошо/плохо"
+// (рост расходов = плохо) StatCard уже сам решает через проп inverseTrend.
 const calculateTrend = (current: number, previous: number): number => {
-  if (previous === 0) return current > 0 ? 100 : current < 0 ? -100 : 0;
-  return ((current - previous) / previous) * 100;
+  const result = calculateTrendResult(current, previous);
+  return result.value ?? (result.direction === 'up' ? 100 : result.direction === 'down' ? -100 : 0);
 };
 
 export function useDashboardData(searchQuery: string = '', dateFilter: string = 'month') {
@@ -26,15 +25,9 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // 3. БЕЗОПАСНАЯ КОНВЕРТАЦИЯ ВАЛЮТ
-  const convertAmount = (amount: number, fromCur: string, toCur: string) => {
-    if (fromCur === toCur) return amount;
-    // Защита от деления на ноль и неизвестных валют
-    const rateFrom = MOCK_RATES[fromCur] || 1;
-    const rateTo = MOCK_RATES[toCur] || 1;
-    const baseAmount = amount / rateFrom;
-    return baseAmount * rateTo;
-  };
+  // 3. БЕЗОПАСНАЯ КОНВЕРТАЦИЯ ВАЛЮТ (общая функция из utils/currency.ts)
+  const convertAmount = (amount: number, fromCur: string, toCur: string) =>
+    sharedConvertAmount(amount, fromCur, toCur, MOCK_RATES);
 
   // 4. БЕЗОПАСНОЕ ФОРМАТИРОВАНИЕ ДЕНЕГ
   const formatMoneyString = (amount: number, curCode: string) => {

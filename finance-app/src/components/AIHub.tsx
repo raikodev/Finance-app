@@ -3,6 +3,7 @@ import { Sparkles, AlertCircle, RefreshCw, ChevronRight, Info, BrainCircuit } fr
 import { motion } from 'framer-motion';
 import { useAppStore } from '../store/useAppStore';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { convertAmount } from '../utils/currency';
 import toast from 'react-hot-toast';
 
 // 1. ЛОКАЛИЗАЦИЯ ИНСАЙТОВ
@@ -61,9 +62,11 @@ export default function AIHub() {
     const expenses = transactions.filter(tx => tx.type === 'expense');
 
     if (expenses.length > 0) {
-      // Ищем самую затратную категорию
+      // Ищем самую затратную категорию (сначала переводим всё в текущую валюту,
+      // иначе суммы в разных валютах складывались бы как одна и та же)
       const catTotals = expenses.reduce((acc, tx) => {
-        acc[tx.category] = (acc[tx.category] || 0) + tx.amount;
+        const amountInBase = convertAmount(Math.abs(tx.amount), tx.currency, currency);
+        acc[tx.category] = (acc[tx.category] || 0) + amountInBase;
         return acc;
       }, {} as Record<string, number>);
 
@@ -81,9 +84,10 @@ export default function AIHub() {
         action: t.btnReview
       });
 
-      // Ищем необычно крупные транзакции (например, больше 500)
-      const largeTx = expenses.find(tx => tx.amount > 500);
+      // Ищем необычно крупные транзакции (порог тоже сравниваем в базовой валюте)
+      const largeTx = expenses.find(tx => convertAmount(Math.abs(tx.amount), tx.currency, currency) > 500);
       if (largeTx) {
+        const largeTxInBase = convertAmount(Math.abs(largeTx.amount), largeTx.currency, currency);
         generated.push({
           id: 'insight-large-tx',
           type: 'warning',
@@ -92,7 +96,7 @@ export default function AIHub() {
           bg: 'bg-rose-500/10 border-rose-500/20',
           title: t.largeTxTitle,
           description: `${largeTx.description} ${t.largeTxDesc}`,
-          metric: `-${largeTx.amount} ${currency}`,
+          metric: `-${largeTxInBase.toFixed(0)} ${currency}`,
           action: t.btnCheck
         });
       }

@@ -3,7 +3,17 @@ import { motion } from 'framer-motion';
 import { Download, TrendingUp, TrendingDown, PiggyBank, Target, BarChart3 } from 'lucide-react';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
+import { convertAmount } from '../utils/currency';
 import toast from 'react-hot-toast';
+
+// Полные строки классов — Tailwind не умеет резолвить bg-${color}-50 в рантайме,
+// ему нужны готовые литералы прямо в исходниках, иначе класс не попадёт в сборку
+const KPI_COLOR_MAP: Record<string, string> = {
+  emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400',
+  blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  indigo: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+};
 
 export default function ReportsPage() {
   const transactions = useTransactionStore((state) => state.transactions);
@@ -43,13 +53,16 @@ export default function ReportsPage() {
       });
 
       // Считаем доходы и расходы (используем строчные 'income'/'expense' из нового стора)
-      const income = monthTxs.filter(t => t.type === 'income').reduce((acc, t) => acc + Math.abs(t.amount), 0);
-      const expense = monthTxs.filter(t => t.type === 'expense').reduce((acc, t) => acc + Math.abs(t.amount), 0);
+      // и переводим каждую транзакцию в текущую валюту перед суммированием
+      const income = monthTxs.filter(t => t.type === 'income')
+        .reduce((acc, t) => acc + convertAmount(Math.abs(t.amount), t.currency, currency), 0);
+      const expense = monthTxs.filter(t => t.type === 'expense')
+        .reduce((acc, t) => acc + convertAmount(Math.abs(t.amount), t.currency, currency), 0);
 
       data.push({ date: d, monthKey, income, expense });
     }
     return data;
-  }, [transactions]); // Зависит только от транзакций, а не от языка!
+  }, [transactions, currency]); // currency важна для конвертации
 
   // Шаг Б: Локализуем метки для графика
   const chartData = useMemo(() => {
@@ -62,15 +75,17 @@ export default function ReportsPage() {
 
   // 3. ГЛОБАЛЬНАЯ АНАЛИТИКА (За все время)
   const globalStats = useMemo(() => {
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Math.abs(t.amount), 0);
-    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Math.abs(t.amount), 0);
+    const totalIncome = transactions.filter(t => t.type === 'income')
+      .reduce((acc, t) => acc + convertAmount(Math.abs(t.amount), t.currency, currency), 0);
+    const totalExpense = transactions.filter(t => t.type === 'expense')
+      .reduce((acc, t) => acc + convertAmount(Math.abs(t.amount), t.currency, currency), 0);
     
     const net = totalIncome - totalExpense;
     // Корректный Savings Rate (защита от деления на ноль)
     const savingsRate = totalIncome > 0 ? ((net) / totalIncome) * 100 : 0;
 
     return { totalIncome, totalExpense, net, savingsRate };
-  }, [transactions]);
+  }, [transactions, currency]);
 
   // 4. ДИНАМИЧЕСКАЯ ШКАЛА Y (Защита от Infinity)
   const maxChartValue = useMemo(() => {
@@ -144,7 +159,7 @@ export default function ReportsPage() {
                   {stat.value}
                 </h3>
               </div>
-              <div className={`p-2.5 rounded-xl bg-${stat.color}-50 dark:bg-${stat.color}-500/10 text-${stat.color}-600 dark:text-${stat.color}-400`}>
+              <div className={`p-2.5 rounded-xl ${KPI_COLOR_MAP[stat.color]}`}>
                 <stat.icon size={20} />
               </div>
             </div>
