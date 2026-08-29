@@ -1,0 +1,6 @@
+node_modules/
+finance-app/node_modules/
+.env
+finance-app/.env
+finance-app/dist/
+dist/

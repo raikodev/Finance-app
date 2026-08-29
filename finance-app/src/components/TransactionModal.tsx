@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, X, Bot, Plus, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import type { TransactionCategory, TransactionType, Transaction } from '../data/transactions';
+import type { TransactionType, Transaction } from '../store/useTransactionStore';
+import { scanReceiptImage, ReceiptScannerDisabledError } from '../services/receiptScanner';
 import toast from 'react-hot-toast';
 
 // Локальный словарь модалки
@@ -11,23 +12,27 @@ const MODAL_T = {
     title: 'Add Transaction', scan: 'AI Receipt Scanner', analyze: 'Clarity AI is analyzing image...', 
     recognized: 'Recognized Transactions:', addAll: 'Add All to Database', errSize: 'File too large (max 4MB)', 
     errParse: 'AI failed to parse the receipt.', drag: 'Click or drag image here',
-    disclaimer: 'Development Mode: API key exposed. Move to backend in production!'
+    disclaimer: 'Development Mode: API key exposed. Move to backend in production!',
+    scannerDisabled: 'Receipt scanning is disabled in this build until a backend proxy is set up.'
   },
   ru: { 
     title: 'Добавить транзакцию', scan: 'ИИ-Сканер чеков', analyze: 'Clarity AI анализирует...', 
     recognized: 'Распознано:', addAll: 'Добавить все в базу', errSize: 'Файл слишком большой (макс 4MB)', 
     errParse: 'ИИ не смог распознать чек.', drag: 'Нажмите или перетащите картинку',
-    disclaimer: 'Режим разработки: API ключ на клиенте. Перенесите на бэкенд!'
+    disclaimer: 'Режим разработки: API ключ на клиенте. Перенесите на бэкенд!',
+    scannerDisabled: 'Сканирование чеков отключено в этой сборке, пока не настроен бэкенд-прокси.'
   },
   pl: { 
     title: 'Dodaj transakcję', scan: 'Skaner paragonów AI', analyze: 'Clarity AI analizuje...', 
     recognized: 'Rozpoznane transakcje:', addAll: 'Dodaj wszystkie', errSize: 'Plik zbyt duży (max 4MB)', 
     errParse: 'AI nie mogło przetworzyć obrazu.', drag: 'Kliknij lub przeciągnij zdjęcie',
-    disclaimer: 'Tryb Dev: Klucz API na froncie. Przenieś na backend w produkcji!'
+    disclaimer: 'Tryb Dev: Klucz API na froncie. Przenieś na backend w produkcji!',
+    scannerDisabled: 'Skanowanie paragonów jest wyłączone w tej wersji do czasu skonfigurowania backendu.'
   }
 };
 
-const VALID_CATEGORIES: TransactionCategory[] = ['Food', 'Housing', 'Transport', 'Software', 'Subscriptions', 'Shopping', 'Salary', 'Freelance'];
+const VALID_CATEGORIES = ['Food', 'Housing', 'Transport', 'Software', 'Subscriptions', 'Shopping', 'Salary', 'Freelance'] as const;
+type TransactionCategory = typeof VALID_CATEGORIES[number];
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -85,59 +90,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
 
     try {
       const base64Image = await fileToBase64(file);
-      const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-      if (!API_KEY) throw new Error("API Key is missing");
-
-      // Даем ИИ контекст текущего дня
-      const today = new Date().toISOString().split('T')[0];
-
-      const promptText = `
-        Analyze this receipt or bank screenshot. Extract all transactions.
-        Current date context: ${today}.
-        Return ONLY a raw JSON array of objects without markdown formatting or code blocks.
-        Each object MUST have exact keys:
-        - description: string (Item or merchant name)
-        - amount: number (Absolute POSITIVE float value only)
-        - currency: string (3-letter code, e.g. USD, EUR, PLN)
-        - category: string (MUST BE EXACTLY ONE OF: Food, Housing, Transport, Software, Subscriptions, Shopping, Salary, Freelance)
-        - type: string (MUST BE EXACTLY: 'expense' or 'income')
-        - date: string (Extract date from receipt in YYYY-MM-DD format. If no date is visible, use ${today})
-      `;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: promptText },
-                { inlineData: { mimeType: file.type, data: base64Image } }
-              ]
-            }]
-          })
-        }
-      );
-
-      if (!response.ok) throw new Error(`API HTTP error: ${response.status}`);
-      
-      const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!rawText) throw new Error("Empty response from AI");
-
-      const cleanJsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      
-      let parsedTx: any;
-      try {
-        parsedTx = JSON.parse(cleanJsonStr);
-      } catch (parseError) {
-        throw new Error(t.errParse);
-      }
-
-      const txArray = Array.isArray(parsedTx) ? parsedTx : [parsedTx];
+      const txArray = await scanReceiptImage(file, base64Image);
 
       const safeTxs = txArray.map((tx: any) => {
         const rawAmount = parseFloat(String(tx.amount).replace(',', '.'));
@@ -170,7 +123,13 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
       toast.success('Successfully scanned!');
 
     } catch (error: any) {
-      toast.error(error.message || t.errParse);
+      if (error instanceof ReceiptScannerDisabledError) {
+        toast.error(t.scannerDisabled);
+      } else if (error?.message === 'AI_PARSE_ERROR') {
+        toast.error(t.errParse);
+      } else {
+        toast.error(error?.message || t.errParse);
+      }
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
