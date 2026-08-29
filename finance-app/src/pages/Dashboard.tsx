@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Globe, ChevronDown } from 'lucide-react';
 
 // Импорт сторов
-import { useAppStore, type AppLanguage } from '../store/useAppStore';
+import { useAppStore, type AppLanguage, type AppCurrency } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { useTransactionStore } from '../store/useTransactionStore';
+import { useTransactionStore, type Transaction } from '../store/useTransactionStore';
 import { useDashboardData } from '../hooks/useDashboardData';
 
 // Компоненты
@@ -70,25 +70,28 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 5. БЕЗОПАСНОЕ ДОБАВЛЕНИЕ ТРАНЗАКЦИИ (С фиксом TypeScript и регистра!)
-  const handleAddTransaction = (txData: any) => {
+  // 5. БЕЗОПАСНОЕ ДОБАВЛЕНИЕ ТРАНЗАКЦИИ
+  const handleAddTransaction = (txData: Omit<Transaction, 'id'>) => {
+    // TransactionModal уже отдаёт строго 'income' | 'expense' (см. TransactionType в сторе).
+    // Раньше здесь стояло .charAt(0).toUpperCase()..., которое портило type на 'Income'/'Expense' —
+    // из-за этого весь дашборд, графики и AI-инсайты переставали видеть новые транзакции,
+    // потому что везде в проекте сравнение идёт как tx.type === 'income' / 'expense'.
     addTransaction({
+      ...txData,
       date: txData.date || new Date().toISOString(),
       description: txData.description || t.addTransaction || 'New transaction',
-      category: txData.category,
-      // Строго Заглавная буква ('Income' | 'Expense') для совместимости со стором
-      type: txData.type.charAt(0).toUpperCase() + txData.type.slice(1).toLowerCase(), 
-      amount: parseFloat(txData.amount),
-      currency: currency, // <-- ДОБАВЛЕНО: TypeScript теперь счастлив!
+      currency: txData.currency || currency,
     });
     setIsModalOpen(false);
   };
 
-  // 6. FALLBACK ДЛЯ ВАЛЮТ
-  const popularFiat = Object.keys(rates || {});
-  const filteredCurrencies = popularFiat.length > 0 
-    ? popularFiat.filter(c => !c.includes('ETH') && !c.includes('BTC')).sort()
-    : ['USD', 'EUR', 'GBP', 'RUB', 'PLN']; 
+  // 6. ДОСТУПНЫЕ ВАЛЮТЫ ДЛЯ ВЫБОРА
+  // Раньше список брался из Object.keys(rates) (все 6 валют в MOCK_RATES, включая
+  // GBP/UAH) и приводился через `as any`, хотя AppCurrency разрешает только 4 —
+  // из-за этого можно было выбрать валюту, не входящую в тип стора. Теперь список
+  // жёстко ограничен тем же набором, что и в SettingsPage.
+  const SUPPORTED_CURRENCIES: AppCurrency[] = ['USD', 'EUR', 'PLN', 'RUB'];
+  const filteredCurrencies = SUPPORTED_CURRENCIES.filter(c => (rates || {})[c] !== undefined);
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-10 flex flex-col gap-6">
@@ -154,7 +157,7 @@ export default function Dashboard() {
                 {filteredCurrencies.map((c) => (
                   <button
                     key={c}
-                    onClick={() => { setCurrency(c as any); setActiveDropdown(null); }}
+                    onClick={() => { setCurrency(c); setActiveDropdown(null); }}
                     className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                       currency === c ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
                     }`}

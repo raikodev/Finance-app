@@ -23,6 +23,7 @@ interface TransactionState {
   addTransaction: (txData: Omit<Transaction, 'id'>) => string; // Возвращает ID новой транзакции
   updateTransaction: (id: string, updates: Partial<Omit<Transaction, 'id'>>) => boolean;
   deleteTransaction: (id: string) => boolean;
+  clearAllTransactions: () => void; // Для "Delete Everything" в настройках
   
   // Заготовка для реального бекенда
   fetchTransactions: () => Promise<void>;
@@ -115,6 +116,10 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     });
 
     return isSuccess;
+  },
+
+  clearAllTransactions: () => {
+    set({ transactions: [] });
   },
 
   // 5. ИНФРАСТРУКТУРА ДЛЯ РЕАЛЬНОГО API
