@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -40,7 +40,7 @@ const ChunkErrorFallback = () => (
 
 // --- ЛОГИКА ТЕМЫ (ИЗОЛИРОВАННАЯ) ---
 
-function ThemeProvider({ children }: { children: React.ReactNode }) {
+function ThemeProvider({ children }: { children: ReactNode }) {
   // Селектор: перерисовка только при смене isDarkMode
   const isDarkMode = useAppStore((state) => state.isDarkMode);
 
@@ -134,13 +134,17 @@ export default function App() {
       touchMultiplier: 2,
     });
 
+    let rafId: number;
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
-    return () => lenis.destroy();
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+    };
   }, []);
 
   return (

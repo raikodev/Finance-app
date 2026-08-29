@@ -18,6 +18,17 @@ export interface TranslationDictionary {
     subtitle: string;
     baseCurrency: string;
     addTransaction: string;
+    totalBalance: string;
+    totalIncome: string;
+    totalExpenses: string;
+    records: string;
+    vsLastPeriod: string;
+    spendingOverview: string;
+    total: string;
+    cashFlow: string;
+    income: string;
+    expenses: string;
+    noData: string;
   };
   ai: {
     // 2. ДИНАМИЧЕСКИЕ ЗНАЧЕНИЯ (Функции вместо хардкода)
@@ -51,7 +62,18 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       welcome: "Welcome back",
       subtitle: "Here's what's happening with your finances today.",
       baseCurrency: "Base:",
-      addTransaction: "Add"
+      addTransaction: "Add",
+      totalBalance: "Total Balance",
+      totalIncome: "Total Income",
+      totalExpenses: "Total Expenses",
+      records: "Records",
+      vsLastPeriod: "vs last period",
+      spendingOverview: "Spending Overview",
+      total: "TOTAL",
+      cashFlow: "Cash Flow Analytics",
+      income: "Income",
+      expenses: "Expenses",
+      noData: "No data available"
     },
     ai: {
       // Имя передается из компонента! Никакого "Ilyar"
@@ -83,7 +105,18 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       welcome: "С возвращением",
       subtitle: "Вот что происходит с вашими финансами сегодня.",
       baseCurrency: "Базовая:",
-      addTransaction: "Добавить"
+      addTransaction: "Добавить",
+      totalBalance: "Общий баланс",
+      totalIncome: "Общий доход",
+      totalExpenses: "Общие расходы",
+      records: "Записи",
+      vsLastPeriod: "за прошлый период",
+      spendingOverview: "Обзор расходов",
+      total: "ИТОГО",
+      cashFlow: "Анализ денежного потока",
+      income: "Доход",
+      expenses: "Расход",
+      noData: "Нет данных"
     },
     ai: {
       greeting: (name) => `Привет, ${name}! Я Clarity AI. Спросите меня о расходах или доходах.`,
@@ -114,7 +147,18 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       welcome: "Witaj ponownie",
       subtitle: "Oto co dzieje się dzisiaj z Twoimi finansami.",
       baseCurrency: "Waluta:",
-      addTransaction: "Dodaj"
+      addTransaction: "Dodaj",
+      totalBalance: "Saldo całkowite",
+      totalIncome: "Całkowity dochód",
+      totalExpenses: "Całkowite wydatki",
+      records: "Rekordy",
+      vsLastPeriod: "vs poprzedni okres",
+      spendingOverview: "Przegląd wydatków",
+      total: "RAZEM",
+      cashFlow: "Analiza przepływu środków",
+      income: "Dochód",
+      expenses: "Wydatki",
+      noData: "Brak danych"
     },
     ai: {
       greeting: (name) => `Cześć ${name}! Jestem Clarity AI. Zapytaj mnie o swoje wydatki.`,

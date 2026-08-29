@@ -4,6 +4,7 @@ import { Globe, Moon, Sun, Download, Trash2, Bell, Shield, Mail, CreditCard, Log
 import { useAppStore, type AppLanguage, type AppCurrency } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { useChatStore } from '../store/useChatStore';
 import { downloadCSV } from '../utils/export';
 import toast from 'react-hot-toast'; // Или ваша библиотека уведомлений
 
@@ -48,6 +49,8 @@ export default function SettingsPage() {
   const { lang, setLang, currency, setCurrency, isDarkMode, toggleTheme } = useAppStore();
   const { user, logout } = useAuthStore();
   const transactions = useTransactionStore((state) => state.transactions);
+  const clearAllTransactions = useTransactionStore((state) => state.clearAllTransactions);
+  const clearChat = useChatStore((state) => state.clearChat);
 
   // Локальные настройки (имитация, так как нет бэкенда для их сохранения)
   const [emailAlerts, setEmailAlerts] = useState(true);
@@ -68,7 +71,11 @@ export default function SettingsPage() {
 
   const handleDeleteEverything = () => {
     if (window.confirm("Are you absolutely sure? This will delete all your transactions and chat history. This action cannot be undone.")) {
-      // Имитация полного удаления через логаут (который чистит все сторы)
+      // logout() сам по себе чистит только useAppStore (тема/язык/валюта) через событие
+      // auth-logout — ни транзакции, ни чат на это событие не подписаны, поэтому чистим
+      // их явно, а не полагаемся на побочный эффект логаута.
+      clearAllTransactions();
+      clearChat();
       logout();
       toast.success("All data has been permanently deleted.");
     }

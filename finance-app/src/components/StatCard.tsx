@@ -10,6 +10,7 @@ interface StatCardProps {
   color: 'orange' | 'indigo' | 'emerald' | 'rose' | 'blue'; // Строгий список с нашим брендом
   isPrimary?: boolean;
   inverseTrend?: boolean; // Рост расходов = плохо
+  trendLabel?: string; // "vs last period" — вынесено в проп, чтобы поддерживать i18n
 }
 
 export default function StatCard({
@@ -19,13 +20,14 @@ export default function StatCard({
   icon,
   color,
   isPrimary = false,
-  inverseTrend = false
+  inverseTrend = false,
+  trendLabel = 'vs last period'
 }: StatCardProps) {
   
   // 1. ЕДИНАЯ ПАЛИТРА ЦВЕТОВ (Без оранжевого текста в синем фоне!)
   const colorMap = {
     orange: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/20',
-    indigo: 'bg-orange-50 dark:bg-orange-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-orange-500/20',
+    indigo: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20',
     emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20',
     rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/20',
     blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20',
@@ -94,7 +96,7 @@ export default function StatCard({
             </span>
           </div>
           <span className="text-xs font-medium text-gray-400">
-            vs last period
+            {trendLabel}
           </span>
         </div>
       )}

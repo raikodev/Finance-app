@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sparkles, Mail, Lock, ArrowRight, Fingerprint, UserCircle } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -14,6 +14,10 @@ const PAGE_CONTENT = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // RequireAuth (App.tsx) сохраняет сюда путь, с которого неавторизованного
+  // пользователя редиректнуло на /auth — возвращаем его туда же после входа.
+  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || '/dashboard';
   const { lang } = useAppStore();
   const t = PAGE_CONTENT[lang];
   const { loginWithEmail, loginAsGuest, isLoading, error, clearError } = useAuthStore();
@@ -36,7 +40,7 @@ export default function AuthPage() {
     try {
       await loginWithEmail(capitalizedName || 'User', formData.email);
       toast.success('Successfully logged in!');
-      navigate('/dashboard', { replace: true });
+      navigate(from, { replace: true });
     } catch (err: any) {
       toast.error(err.message || 'Authentication failed');
     }
@@ -46,7 +50,7 @@ export default function AuthPage() {
     try {
       await loginAsGuest();
       toast.success('Logged in as Guest');
-      navigate('/dashboard', { replace: true });
+      navigate(from, { replace: true });
     } catch (err) {
       toast.error('Failed to enter guest mode');
     }

@@ -1,11 +1,18 @@
-import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, Scan, Bot, CreditCard, ChevronRight, Menu } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Sparkles, Scan, Bot, CreditCard, ChevronRight, Menu, X } from 'lucide-react';
 
 export default function LandingPage({ onStart }: { onStart: () => void }) {
   // Яркий, сочный оранжевый градиент для графиков и кнопок
   const brandGradient = "bg-gradient-to-r from-[#FF6B00] to-[#FF4500]";
   const brandText = "text-[#FF4500]";
   const brandBg = "bg-[#FF4500]";
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Закрываем меню перед переходом на якорь/действие, иначе оно остаётся
+  // открытым поверх контента после клика
+  const handleMobileNavClick = () => setIsMobileMenuOpen(false);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white overflow-x-hidden font-sans scroll-smooth">
@@ -42,9 +49,52 @@ export default function LandingPage({ onStart }: { onStart: () => void }) {
         </div>
 
         {/* Мобильное меню */}
-        <button className="md:hidden text-gray-400 hover:text-white">
-          <Menu size={24} />
+        <button
+          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          aria-expanded={isMobileMenuOpen}
+          aria-label="Toggle menu"
+          className="md:hidden text-gray-400 hover:text-white z-50"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
+
+        {/* Выпадающее мобильное меню */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden absolute top-full left-0 right-0 mx-4 mt-2 bg-[#0A0A0C] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-40"
+            >
+              <div className="flex flex-col p-2">
+                <a href="#features" onClick={handleMobileNavClick} className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                  Features
+                </a>
+                <a href="#how-it-works" onClick={handleMobileNavClick} className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                  How it works
+                </a>
+                <a href="#ai-assistant" onClick={handleMobileNavClick} className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                  AI Assistant
+                </a>
+                <div className="h-px bg-white/10 my-2" />
+                <button
+                  onClick={() => { handleMobileNavClick(); onStart(); }}
+                  className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors text-left"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => { handleMobileNavClick(); onStart(); }}
+                  className={`mt-1 px-4 py-3 ${brandBg} hover:bg-[#E63E00] text-white rounded-xl text-sm font-medium transition-colors text-center`}
+                >
+                  Get started
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 pt-12 lg:pt-24 pb-32">

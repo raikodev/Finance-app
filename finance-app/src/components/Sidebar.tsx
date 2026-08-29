@@ -60,7 +60,7 @@ export default function Sidebar() {
     e.stopPropagation(); // Предотвращаем клик по карточке профиля
     if (confirm(lang === 'ru' ? 'Выйти из системы?' : 'Sign out?')) {
       logout();
-      navigate('/login');
+      navigate('/auth');
     }
   };
 
@@ -208,7 +208,7 @@ export default function Sidebar() {
                 }
               >
                 <item.icon size={18} />
-                <span>item.name</span>
+                <span>{item.name}</span>
               </NavLink>
             ))}
             

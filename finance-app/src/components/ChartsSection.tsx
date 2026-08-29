@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import { PieChart as PieChartIcon, Activity } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import type { TranslationDictionary } from '../locales/translations';
 
 // 1. СТРОГИЕ ИНТЕРФЕЙСЫ (Никаких any)
 interface ChartData {
@@ -23,7 +24,7 @@ interface ChartsSectionProps {
   areaData: ChartData[];
   displayExpenses: number;
   formatMoneyString: (amount: number, currency: string) => string;
-  t: any; // В идеале здесь должен быть строгий интерфейс DASHBOARD_T
+  t: TranslationDictionary['dashboard'];
 }
 
 interface CustomTooltipProps {
@@ -76,7 +77,7 @@ export default function ChartsSection({
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
               <span className="text-gray-500 capitalize">
                 {/* 4. Локализация названия линий в тултипе */}
-                {entry.dataKey === 'income' ? (t.income || 'Income') : (t.expenses || 'Expenses')}:
+                {entry.dataKey === 'income' ? t.income : t.expenses}:
               </span>
               <span className="text-gray-900 dark:text-white font-bold">
                 {formatMoneyString(Number(entry.value || 0), currency)}
@@ -94,7 +95,7 @@ export default function ChartsSection({
       <div className="lg:col-span-1 bg-white dark:bg-[#121214] p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm h-full flex flex-col">
         <div className="flex items-center gap-2 mb-6">
           <PieChartIcon size={20} className="text-orange-500" />
-          <h3 className="font-bold text-gray-900 dark:text-white">{t.spendingOverview || 'Spending Overview'}</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white">{t.spendingOverview}</h3>
         </div>
         
         {pieData.length > 0 ? (
@@ -122,7 +123,7 @@ export default function ChartsSection({
               </ResponsiveContainer>
               {/* Сумма внутри круга */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.total || 'TOTAL'}</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.total}</span>
                 <span className="text-xl font-black text-gray-900 dark:text-white">
                   {formatMoneyString(displayExpenses, currency)}
                 </span>
@@ -146,7 +147,7 @@ export default function ChartsSection({
           </>
         ) : (
           <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm font-medium">
-            {t.noData || 'No data available'}
+            {t.noData}
           </div>
         )}
       </div>
@@ -156,16 +157,16 @@ export default function ChartsSection({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-2">
             <Activity size={20} className="text-orange-500" />
-            <h3 className="font-bold text-gray-900 dark:text-white">{t.cashFlow || 'Cash Flow Analytics'}</h3>
+            <h3 className="font-bold text-gray-900 dark:text-white">{t.cashFlow}</h3>
           </div>
           <div className="flex items-center gap-4 text-xs font-bold">
             <div className="flex items-center gap-1.5 text-gray-500">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              {t.income || 'Income'}
+              {t.income}
             </div>
             <div className="flex items-center gap-1.5 text-gray-500">
               <div className="w-2 h-2 rounded-full bg-rose-500" />
-              {t.expenses || 'Expenses'}
+              {t.expenses}
             </div>
           </div>
         </div>
@@ -221,7 +222,7 @@ export default function ChartsSection({
           </div>
         ) : (
           <div className="flex-1 min-h-[250px] flex items-center justify-center text-gray-400 text-sm font-medium">
-            {t.noData || 'No data available'}
+            {t.noData}
           </div>
         )}
       </div>
