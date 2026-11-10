@@ -74,6 +74,9 @@ export type CategoryIconKey = keyof typeof CATEGORY_ICONS;
 
 export interface CategoryMeta extends CategoryPalette {
   icon: LucideIcon;
+  // Ключ иконки из CATEGORY_ICONS — его можно сохранить в транзакции,
+  // потому что сам компонент LucideIcon в localStorage не сериализуется.
+  iconKey: string;
   isCustomColor: boolean;
 }
 
@@ -83,14 +86,14 @@ const palette = (key: string): CategoryPalette =>
 // Встроенные категории: цвет + иконка. hex используется для графиков и inline-стилей,
 // чтобы пользовательские hex-цвета отображались так же, как пресеты.
 export const CATEGORY_META: Record<string, CategoryMeta> = {
-  'Food': { icon: Coffee, ...palette('red'), isCustomColor: false },
-  'Housing': { icon: Home, ...palette('orange'), isCustomColor: false },
-  'Transport': { icon: Car, ...palette('amber'), isCustomColor: false },
-  'Software': { icon: MonitorPlay, ...palette('blue'), isCustomColor: false },
-  'Subscriptions': { icon: Zap, ...palette('violet'), isCustomColor: false },
-  'Shopping': { icon: ShoppingBag, ...palette('fuchsia'), isCustomColor: false },
-  'Salary': { icon: Briefcase, ...palette('emerald'), isCustomColor: false },
-  'Freelance': { icon: Globe, ...palette('cyan'), isCustomColor: false },
+  'Food': { icon: Coffee, iconKey: 'coffee', ...palette('red'), isCustomColor: false },
+  'Housing': { icon: Home, iconKey: 'home', ...palette('orange'), isCustomColor: false },
+  'Transport': { icon: Car, iconKey: 'car', ...palette('amber'), isCustomColor: false },
+  'Software': { icon: MonitorPlay, iconKey: 'software', ...palette('blue'), isCustomColor: false },
+  'Subscriptions': { icon: Zap, iconKey: 'zap', ...palette('violet'), isCustomColor: false },
+  'Shopping': { icon: ShoppingBag, iconKey: 'shopping', ...palette('fuchsia'), isCustomColor: false },
+  'Salary': { icon: Briefcase, iconKey: 'salary', ...palette('emerald'), isCustomColor: false },
+  'Freelance': { icon: Globe, iconKey: 'freelance', ...palette('cyan'), isCustomColor: false },
 };
 
 export const getCategoryMeta = (categoryName: string): CategoryMeta => {
@@ -111,6 +114,7 @@ export const getCategoryMeta = (categoryName: string): CategoryMeta => {
       : palette(custom.color);
     return {
       icon: CATEGORY_ICONS[custom.icon] || Folder,
+      iconKey: CATEGORY_ICONS[custom.icon] ? custom.icon : 'folder',
       ...colorPalette,
       isCustomColor: Boolean(isHex),
     };
@@ -118,8 +122,63 @@ export const getCategoryMeta = (categoryName: string): CategoryMeta => {
 
   return {
     icon: Folder,
+    iconKey: 'folder',
     ...palette('slate'),
     isCustomColor: false,
+  };
+};
+
+// Цвет и иконка, которые можно сохранить в транзакции. Храним только
+// сериализуемые значения (hex + ключ иконки), чтобы после удаления
+// пользовательской категории старые операции не теряли свой вид.
+export interface CategorySnapshot {
+  categoryColor?: string;
+  categoryIcon?: string;
+}
+
+const isHexColor = (value: string): boolean => /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(value);
+
+const findPaletteByHex = (hex: string): CategoryPalette | null => {
+  const normalized = hex.toLowerCase();
+  return Object.values(CUSTOM_CATEGORY_COLORS).find(
+    (preset) => preset.hex.toLowerCase() === normalized
+  ) ?? null;
+};
+
+export const getCategorySnapshot = (categoryName: string): CategorySnapshot => {
+  const meta = getCategoryMeta(categoryName);
+  return { categoryColor: meta.hex, categoryIcon: meta.iconKey };
+};
+
+/**
+ * Разрешает вид категории: сначала сохранённый в транзакции снапшот,
+ * затем живой стор. Для старых транзакций без снапшота поведение прежнее.
+ */
+export const getCategoryMetaFromSnapshot = (
+  categoryName: string,
+  snapshot?: CategorySnapshot | null,
+): CategoryMeta => {
+  const liveMeta = getCategoryMeta(categoryName);
+
+  if (!snapshot?.categoryColor || !isHexColor(snapshot.categoryColor)) {
+    return liveMeta;
+  }
+
+  const iconKey = snapshot.categoryIcon && CATEGORY_ICONS[snapshot.categoryIcon]
+    ? snapshot.categoryIcon
+    : liveMeta.iconKey;
+  const preset = findPaletteByHex(snapshot.categoryColor);
+
+  return {
+    ...(preset ?? {
+      hex: snapshot.categoryColor,
+      color: '',
+      bg: '',
+      iconBg: '',
+    }),
+    icon: CATEGORY_ICONS[iconKey] || Folder,
+    iconKey,
+    isCustomColor: preset === null,
   };
 };
 
