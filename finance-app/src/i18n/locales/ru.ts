@@ -237,6 +237,7 @@ export default {
     errGuestFailed: 'Не удалось войти в гостевом режиме',
     recoverySent: 'Письмо для восстановления отправлено',
     oauthComingSoon: 'OAuth скоро будет доступен',
+    sessionExpired: 'Сессия истекла. Войдите снова.',
   },
 
   settings: {

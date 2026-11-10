@@ -237,6 +237,7 @@ export default {
     errGuestFailed: 'Nie udało się wejść w tryb gościa',
     recoverySent: 'Wysłano e-mail odzyskiwania',
     oauthComingSoon: 'OAuth wkrótce dostępny',
+    sessionExpired: 'Sesja wygasła. Zaloguj się ponownie.',
   },
 
   settings: {
