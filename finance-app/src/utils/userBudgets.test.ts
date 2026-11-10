@@ -89,11 +89,13 @@ describe('removeBudgetsForCategory', () => {
 });
 
 describe('clearUserBudgets', () => {
-  it('удаляет все бюджеты', () => {
+  it('очищает бюджеты и сохраняет пустое состояние', () => {
     saveUserBudgets([{ id: '1', category: 'Food', limit: 50 }]);
 
     clearUserBudgets();
 
-    expect(loadUserBudgets()).toBeNull();
+    // Именно [], а не null: иначе BudgetsPage снова покажет демо-бюджеты.
+    expect(loadUserBudgets()).toEqual([]);
+    expect(store.has(BUDGETS_STORAGE_KEY)).toBe(true);
   });
 });
