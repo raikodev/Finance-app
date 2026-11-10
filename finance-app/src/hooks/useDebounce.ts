@@ -12,23 +12,21 @@ import { useState, useEffect } from 'react';
 export function useDebounce<T>(value: T, delay: number = 300): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
-  useEffect(() => {
-    // UX фикс: Если это строка и пользователь очистил поле ввода, 
-    // сбрасываем значение мгновенно, без задержки.
-    if (typeof value === 'string' && value === '') {
-      setDebouncedValue(value);
-      return;
-    }
+  // UX фикс: если пользователь очистил поле ввода, применяем значение сразу.
+  // Нулевая задержка вместо синхронного setState в теле эффекта — так React
+  // не делает каскадный рендер, а значение всё равно обновляется мгновенно.
+  const effectiveDelay = typeof value === 'string' && value === '' ? 0 : delay;
 
+  useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
-    }, delay);
+    }, effectiveDelay);
 
     // Очистка таймера при размонтировании или изменении значения (предотвращает утечки и лишние рендеры)
     return () => {
       clearTimeout(handler);
     };
-  }, [value, delay]);
+  }, [value, effectiveDelay]);
 
   return debouncedValue;
 }
