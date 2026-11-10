@@ -1,7 +1,8 @@
 # HANDOFF — Finance App
 
 Документ для передачи проекта другому разработчику/агенту.
-Актуален на: **10 ноября 2026** (сборка стабилизирована, линт закрыт).
+Актуален на: **10 ноября 2026** (клиентские баги закрыты, остались задачи,
+требующие бэкенда).
 
 ---
 
@@ -230,9 +231,10 @@ finance-app/
 
 8. ✅ **Удалённая категория сохраняет цвет и иконку в старых транзакциях.**
    `addTransaction` пишет в `Transaction` снапшот `categoryColor/categoryIcon`,
-   а `TransactionList` рендерит его через `getCategoryMetaFromSnapshot`.
-   Транзакции, созданные до этого изменения, снапшота не имеют и до сих пор
-   используют живой стор/фолбэк — восстановить их прежний вид нельзя.
+   а `TransactionList` и круговая диаграмма дашборда рендерят его через
+   `getCategoryMetaFromSnapshot`. Транзакции, созданные до этого изменения,
+   снапшота не имеют и до сих пор используют живой стор/фолбэк —
+   восстановить их прежний вид нельзя.
 
 ### 🟡 Техдолг
 
@@ -246,9 +248,10 @@ finance-app/
     в эффекте. В `TransactionModal` намеренный сброс формы при открытии
     помечен точечным `eslint-disable react-hooks/set-state-in-effect`.
 
-11. ✅ **Тесты и CI добавлены.** Vitest-тесты для `utils/currency`,
-    `utils/money`, `utils/export`, `utils/userBudgets` (34 теста).
-    GitHub Actions workflow: `.github/workflows/ci.yml` в корне репозитория
+11. ✅ **Тесты и CI добавлены.** Vitest покрывает утилиты валют, денег,
+    экспорта, бюджетов, сессии, категорий и миграций транзакций
+    (48 тестов на момент передачи). GitHub Actions workflow:
+    `.github/workflows/ci.yml` в корне репозитория
     (typecheck → lint → test → build).
 
 12. ✅ **Графики вынесены из чанка Dashboard.** `recharts` грузится лениво
@@ -279,25 +282,18 @@ finance-app/
 
 ## 9. Git / передача
 
-- Ветка: `main`.
-- Последний коммит: `44c8889 fix: misc bugs from code review — i18n gaps, dead code, a11y, UI polish`.
-- В рабочем дереве много **незакоммиченных** изменений:
-  правки этой итерации + ранее созданные `src/i18n`, новые сторы,
-  утилиты, тесты (`src/utils/*.test.ts`) и `.github/workflows/ci.yml`.
-  Также зафиксировать удаление корневых `package.json`, `package-lock.json`
-  и `node_modules`.
+- Основная ветка: `main`, рабочее дерево чистое.
+- Последний коммит: `d84635d fix(data): migrate legacy demo descriptions on load`.
+- Каждая задача велась в отдельной ветке и вливалась в `main` через
+  **Rebase and merge**, чтобы сохранить линейную историю и отдельные коммиты.
+- CI: `.github/workflows/ci.yml` в корне репозитория
+  (typecheck → lint → test → build); запускается на PR и пушах в `main`.
+- Тесты: `vitest` в devDependencies; скрипты `test`, `test:watch`, `typecheck`.
 - `src/locales/translations.ts` удалён (заменён на `src/i18n/locales/*`).
-- Добавлен `vitest` в devDependencies, скрипты `test`, `test:watch`, `typecheck`.
 - `.env` игнорируется и в репозиторий не попадает — ключ Gemini нужно
   запросить отдельно.
-
-Перед передачей рекомендуется:
-
-```bash
-cd "C:\Users\ilyar\Documents\analitic bank"
-git add -A
-git commit -m "chore: lenis migration, zero lint, landing i18n, unit tests and CI"
-```
+- Корневые `package.json`, `package-lock.json` и `node_modules` удалены:
+  все команды выполняются только из `finance-app`.
 
 ---
 
@@ -313,6 +309,11 @@ git commit -m "chore: lenis migration, zero lint, landing i18n, unit tests and C
 6. **Прокси Gemini** и реальный AI-чат.
 7. ✅ **Полировка UX:** `ConfirmDialog`, focus-trap, `prefers-reduced-motion`,
    ленивые графики, нейтральные демо-данные.
+8. ✅ **Клиентские баги закрыты:** пустые бюджеты после «Удалить всё»,
+   автологаут по истечении сессии, снапшот цвета/иконки категории,
+   миграция старых демо-описаний.
+9. **Дальше:** auth и привязка данных к пользователю, затем прокси Gemini
+   и реальная отправка уведомлений — всё требует бэкенда.
 
 ---
 
