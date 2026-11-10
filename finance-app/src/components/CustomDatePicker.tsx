@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../store/useAppStore';
@@ -10,7 +10,7 @@ interface CustomDatePickerProps {
 }
 
 // 1. УНИВЕРСАЛЬНЫЙ ХУК (Конец дублированию кода)
-function useClickOutside(ref: React.RefObject<any>, handler: () => void) {
+function useClickOutside<T extends HTMLElement>(ref: React.RefObject<T | null>, handler: () => void) {
   useEffect(() => {
     const listener = (event: MouseEvent | TouchEvent) => {
       if (!ref.current || ref.current.contains(event.target as Node)) return;
@@ -30,7 +30,8 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  useClickOutside(popoverRef, () => setIsOpen(false));
+  const closePicker = useCallback(() => setIsOpen(false), []);
+  useClickOutside(popoverRef, closePicker);
 
   // 2. БЕЗОПАСНЫЙ ПАРСИНГ ДАТЫ
   const selectedDate = useMemo(() => {
@@ -39,12 +40,10 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
     return isNaN(d.getTime()) ? null : d;
   }, [value]);
 
-  const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
-
-  // Синхронизация при внешнем изменении
-  useEffect(() => {
-    if (selectedDate) setViewDate(selectedDate);
-  }, [selectedDate]);
+  // Ручная навигация по месяцам. null = показываем месяц выбранной даты,
+  // поэтому не нужен setState в эффекте для синхронизации с value.
+  const [viewOverride, setViewOverride] = useState<Date | null>(null);
+  const viewDate = viewOverride ?? selectedDate ?? new Date();
 
   // 3. АБСОЛЮТНАЯ ЛОКАЛИЗАЦИЯ (Без хардкода массивов)
   const locale = lang === 'ru' ? 'ru-RU' : lang === 'pl' ? 'pl-PL' : 'en-US';
@@ -92,6 +91,8 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     onChange(`${y}-${m}-${d}T12:00:00.000Z`);
+    // Возвращаем вид к выбранному месяцу (selectedDate обновится пропсом value)
+    setViewOverride(null);
     setIsOpen(false);
   };
 
@@ -106,7 +107,11 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
     <div className="relative w-full sm:w-[220px]" ref={popoverRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          // При открытии показываем актуальный выбранный месяц, а не последний просмотренный
+          if (!isOpen) setViewOverride(null);
+          setIsOpen(!isOpen);
+        }}
         className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 rounded-xl text-sm font-medium hover:border-orange-500/50 dark:hover:border-orange-500/50 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
       >
         <span className={selectedDate ? 'text-gray-900 dark:text-white' : 'text-gray-500'}>
@@ -127,7 +132,7 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
             {/* 6. БЫСТРАЯ НАВИГАЦИЯ (Появился выбор Года и Месяца!) */}
             <div className="flex justify-between items-center mb-4 px-1">
               <button 
-                onClick={() => setViewDate(new Date(year, month - 1, 1))} 
+                onClick={() => setViewOverride(new Date(year, month - 1, 1))} 
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
               >
                 <ChevronLeft size={18} />
@@ -136,14 +141,14 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
               <div className="flex gap-1 font-bold text-sm text-gray-900 dark:text-white">
                 <select 
                   value={month} 
-                  onChange={(e) => setViewDate(new Date(year, Number(e.target.value), 1))}
+                  onChange={(e) => setViewOverride(new Date(year, Number(e.target.value), 1))}
                   className="bg-transparent appearance-none cursor-pointer hover:text-orange-500 outline-none capitalize"
                 >
                   {months.map((m, i) => <option key={i} value={i} className="bg-white dark:bg-[#1a1a24] text-gray-900 dark:text-white">{m}</option>)}
                 </select>
                 <select 
                   value={year} 
-                  onChange={(e) => setViewDate(new Date(Number(e.target.value), month, 1))}
+                  onChange={(e) => setViewOverride(new Date(Number(e.target.value), month, 1))}
                   className="bg-transparent appearance-none cursor-pointer hover:text-orange-500 outline-none"
                 >
                   {/* Горизонт планирования: от 10 лет назад до 5 лет вперед */}
@@ -154,7 +159,7 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
               </div>
 
               <button 
-                onClick={() => setViewDate(new Date(year, month + 1, 1))} 
+                onClick={() => setViewOverride(new Date(year, month + 1, 1))} 
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
               >
                 <ChevronRight size={18} />

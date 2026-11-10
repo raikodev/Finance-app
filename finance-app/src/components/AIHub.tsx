@@ -1,56 +1,23 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Sparkles, AlertCircle, RefreshCw, ChevronRight, Info, BrainCircuit } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../store/useAppStore';
 import { useTransactionStore } from '../store/useTransactionStore';
-import { convertAmount } from '../utils/currency';
+import { convertAmount as sharedConvertAmount } from '../utils/currency';
+import { useExchangeRatesStore } from '../store/useExchangeRatesStore';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 
-// 1. ЛОКАЛИЗАЦИЯ ИНСАЙТОВ
-const HUB_T = {
-  en: {
-    title: 'Clarity AI Insights',
-    refresh: 'Refresh',
-    emptyTitle: 'No data for analysis',
-    emptySub: 'Add transactions to unlock AI insights.',
-    btnReview: 'Review',
-    btnCheck: 'Check',
-    topCatTitle: 'Top Spending Category',
-    topCatDesc: 'Most of your expenses go to',
-    largeTxTitle: 'Large Expense Detected',
-    largeTxDesc: 'was unusually high this period.',
-  },
-  ru: {
-    title: 'Clarity AI Аналитика',
-    refresh: 'Обновить',
-    emptyTitle: 'Нет данных для анализа',
-    emptySub: 'Добавьте транзакции, чтобы ИИ смог их изучить.',
-    btnReview: 'Смотреть',
-    btnCheck: 'Проверить',
-    topCatTitle: 'Главная статья расходов',
-    topCatDesc: 'Больше всего средств уходит на',
-    largeTxTitle: 'Крупное списание',
-    largeTxDesc: 'выглядит необычно высоким.',
-  },
-  pl: {
-    title: 'Analiza Clarity AI',
-    refresh: 'Odśwież',
-    emptyTitle: 'Brak danych do analizy',
-    emptySub: 'Dodaj transakcje, aby odblokować AI.',
-    btnReview: 'Przejrzyj',
-    btnCheck: 'Sprawdź',
-    topCatTitle: 'Główna kategoria wydatków',
-    topCatDesc: 'Większość Twoich wydatków to',
-    largeTxTitle: 'Duży wydatek',
-    largeTxDesc: 'jest nietypowo wysoki.',
-  }
-};
-
 export default function AIHub() {
-  const lang = useAppStore(s => s.lang);
   const currency = useAppStore(s => s.currency);
+  const liveRates = useExchangeRatesStore(s => s.rates);
   const transactions = useTransactionStore(s => s.transactions);
-  const t = HUB_T[lang];
+  const convertAmount = useCallback(
+    (amount: number, fromCur: string, toCur: string) =>
+      sharedConvertAmount(amount, fromCur, toCur, liveRates),
+    [liveRates]
+  );
+  const { t } = useTranslation();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -78,10 +45,10 @@ export default function AIHub() {
         icon: Info,
         color: 'text-blue-500',
         bg: 'bg-blue-500/10 border-blue-500/20',
-        title: t.topCatTitle,
-        description: `${t.topCatDesc} ${topCat[0]}.`,
+        title: t('aiInsights.topCatTitle'),
+        description: `${t('aiInsights.topCatDesc')} ${topCat[0]}.`,
         metric: `${topCat[1].toFixed(0)} ${currency}`,
-        action: t.btnReview
+        action: t('aiInsights.btnReview')
       });
 
       // Ищем необычно крупные транзакции (порог тоже сравниваем в базовой валюте)
@@ -94,28 +61,28 @@ export default function AIHub() {
           icon: AlertCircle,
           color: 'text-rose-500',
           bg: 'bg-rose-500/10 border-rose-500/20',
-          title: t.largeTxTitle,
-          description: `${largeTx.description} ${t.largeTxDesc}`,
+          title: t('aiInsights.largeTxTitle'),
+          description: `${largeTx.description} ${t('aiInsights.largeTxDesc')}`,
           metric: `-${largeTxInBase.toFixed(0)} ${currency}`,
-          action: t.btnCheck
+          action: t('aiInsights.btnCheck')
         });
       }
     }
 
     return generated;
-  }, [transactions, currency, lang, t]);
+  }, [transactions, currency, t, convertAmount]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
     // Имитация работы ИИ
     setTimeout(() => {
       setIsRefreshing(false);
-      toast.success(lang === 'ru' ? 'Аналитика обновлена' : 'Insights refreshed');
+      toast.success(t('aiInsights.refreshSuccess'));
     }, 1000);
   };
 
   const handleActionClick = (actionName: string) => {
-    toast(`Action triggered: ${actionName}`, { icon: '🤖' });
+    toast(t('aiInsights.actionTriggered', { action: actionName }), { icon: '🤖' });
   };
 
   return (
@@ -126,7 +93,7 @@ export default function AIHub() {
           <div className="bg-orange-500/10 p-1.5 rounded-lg">
             <Sparkles size={16} className="text-orange-500" />
           </div>
-          <h3 className="font-bold text-gray-900 dark:text-white">{t.title}</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white">{t('aiInsights.title')}</h3>
         </div>
         
         {/* Рабочая кнопка обновления */}
@@ -136,18 +103,18 @@ export default function AIHub() {
           className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50"
         >
           <RefreshCw size={12} className={isRefreshing ? 'animate-spin text-orange-500' : ''} />
-          <span className="uppercase tracking-wider">{t.refresh}</span>
+          <span className="uppercase tracking-wider">{t('aiInsights.refresh')}</span>
         </button>
       </div>
 
-      <div className="flex-1 p-4 sm:p-5 overflow-y-auto custom-scrollbar">
+      <div data-lenis-prevent className="flex-1 p-4 sm:p-5 overflow-y-auto custom-scrollbar">
         {/* 3. ЧЕСТНОЕ ПУСТОЕ СОСТОЯНИЕ (Больше не исчезаем) */}
         {transactions.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-60">
             <BrainCircuit size={40} className="text-gray-400" />
             <div>
-              <p className="text-sm font-bold text-gray-900 dark:text-white">{t.emptyTitle}</p>
-              <p className="text-xs text-gray-500 mt-1">{t.emptySub}</p>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">{t('aiInsights.emptyTitle')}</p>
+              <p className="text-xs text-gray-500 mt-1">{t('aiInsights.emptySub')}</p>
             </div>
           </div>
         ) : (
