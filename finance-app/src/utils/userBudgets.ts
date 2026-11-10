@@ -55,9 +55,8 @@ export const removeBudgetsForCategory = (category: string): number => {
 };
 
 export const clearUserBudgets = (): void => {
-  try {
-    localStorage.removeItem(BUDGETS_STORAGE_KEY);
-  } catch {
-    // localStorage недоступен (приватный режим) — не критично
-  }
+  // Пишем пустой массив, а не удаляем ключ: отсутствие ключа означает
+  // «бюджеты ещё не создавались», и BudgetsPage снова подставил бы демо.
+  // Пустой массив — это осознанное состояние «бюджетов нет».
+  saveUserBudgets([]);
 };
