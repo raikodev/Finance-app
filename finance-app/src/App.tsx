@@ -2,7 +2,11 @@ import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
-import Lenis from '@studio-freight/lenis';
+import { MotionConfig } from 'framer-motion';
+import Lenis from 'lenis';
+import i18n from './i18n';
+import { useTranslation } from 'react-i18next';
+import { useExchangeRatesStore } from './store/useExchangeRatesStore';
 
 import { useAppStore } from './store/useAppStore';
 import { useAuthStore } from './store/useAuthStore';
@@ -28,15 +32,18 @@ const PageLoader = () => (
   </div>
 );
 
-const ChunkErrorFallback = () => (
-  <div className="flex flex-col items-center justify-center h-full text-center p-6 min-h-screen">
-    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Failed to load content</h2>
-    <p className="text-gray-500 mb-4">Please check your connection and try again.</p>
-    <button onClick={() => window.location.reload()} className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-600 transition-colors">
-      Reload Page
-    </button>
-  </div>
-);
+const ChunkErrorFallback = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center p-6 min-h-screen">
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('common.loadFailed')}</h2>
+      <p className="text-gray-500 mb-4">{t('common.loadFailedDesc')}</p>
+      <button onClick={() => window.location.reload()} className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-600 transition-colors">
+        {t('common.reload')}
+      </button>
+    </div>
+  );
+};
 
 // --- ЛОГИКА ТЕМЫ (ИЗОЛИРОВАННАЯ) ---
 
@@ -56,6 +63,21 @@ function ThemeProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// --- СИНХРОНИЗАЦИЯ ЯЗЫКА С i18next ---
+// useAppStore.lang остаётся единственным источником правды (persist в localStorage,
+// переключатели языка в Sidebar/Dashboard/Settings меняют именно его) — i18next
+// просто следует за ним реактивно, а не хранит своё отдельное состояние языка.
+
+function LanguageSync({ children }: { children: ReactNode }) {
+  const lang = useAppStore((state) => state.lang);
+
+  useEffect(() => {
+    i18n.changeLanguage(lang);
+  }, [lang]);
+
+  return <>{children}</>;
+}
+
 // --- ЛОГИКА АВТОРИЗАЦИИ И СОХРАНЕНИЯ МАРШРУТА ---
 
 function RequireAuth() {
@@ -63,14 +85,20 @@ function RequireAuth() {
   const location = useLocation();
 
   if (!isAuthenticated) {
-    // Сохраняем URL, куда хотел попасть пользователь, чтобы вернуть его после логина
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    // Раньше редиректило на /auth — но это создавало гонку с явным navigate('/')
+    // в обработчиках логаута (Sidebar/SettingsPage): их вызов и этот редирект
+    // иногда "спорили" за то, куда переходить, и /auth побеждал непредсказуемо.
+    // Теперь оба пути ведут на одно и то же место — гонка больше не имеет значения.
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   // Главный Layout для авторизованной зоны (с сайдбаром и скроллом)
+  // На мобильном раскладка идёт КОЛОНКОЙ (Sidebar рендерит верхний бар, а не боковую
+  // панель), поэтому aside больше не требует h-screen/sticky ниже md — раньше это
+  // создавало на мобильном "невидимую" колонку на всю высоту экрана рядом с контентом.
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-[#0A0A0C] font-sans transition-colors duration-500">
-      <aside className="sticky top-0 h-screen shrink-0 z-50">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 dark:bg-[#0A0A0C] font-sans transition-colors duration-500">
+      <aside className="md:sticky md:top-0 md:h-screen shrink-0 z-[150]">
         <Sidebar />
       </aside>
       <main className="flex-1 flex flex-col min-w-0 p-4 md:px-6 md:py-5 text-gray-900 dark:text-gray-100">
@@ -124,8 +152,22 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // Загружаем живые курсы валют один раз при старте приложения. Стор сам
+  // защищён от повторных запросов чаще раза в час (см. useExchangeRatesStore) —
+  // безопасно вызывать даже если компонент перемонтируется.
+  const fetchRates = useExchangeRatesStore((state) => state.fetchRates);
+  useEffect(() => {
+    fetchRates();
+  }, [fetchRates]);
+
   // Инициализация Lenis (Smooth Scroll)
   useEffect(() => {
+    // Пользователям с prefers-reduced-motion плавный скролл не нужен:
+    // оставляем нативный скролл браузера и не запускаем rAF-цикл.
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
     const lenis = new Lenis({
       duration: 1.2,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -149,9 +191,13 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <AppRoutes />
-      </ThemeProvider>
+      <MotionConfig reducedMotion="user">
+        <ThemeProvider>
+          <LanguageSync>
+            <AppRoutes />
+          </LanguageSync>
+        </ThemeProvider>
+      </MotionConfig>
     </BrowserRouter>
   );
 }
