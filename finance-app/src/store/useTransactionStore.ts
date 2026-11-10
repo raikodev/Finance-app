@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // 1. СТРОГИЕ ТИПЫ
 export type TransactionType = 'income' | 'expense';
@@ -11,6 +12,8 @@ export interface Transaction {
   category: string;
   description: string;
   currency: string;
+  needsReview?: boolean;
+  rawCurrency?: string;
 }
 
 interface TransactionState {
@@ -30,108 +33,119 @@ interface TransactionState {
 }
 
 // 2. АДЕКВАТНЫЕ МОК-ДАННЫЕ
-// Реалистичные категории и суммы. Amounts строго положительные!
+// Показываются только при самом первом запуске — дальше persist хранит
+// реальные транзакции пользователя в localStorage.
 const INITIAL_TRANSACTIONS: Transaction[] = [
-  { id: crypto.randomUUID(), date: new Date().toISOString(), amount: 3200.00, type: 'income', category: 'Freelance', description: 'Stripe Payout', currency: 'USD' },
-  { id: crypto.randomUUID(), date: new Date(Date.now() - 86400000).toISOString(), amount: 142.50, type: 'expense', category: 'Software', description: 'AWS Cloud Services', currency: 'USD' },
-  { id: crypto.randomUUID(), date: new Date(Date.now() - 172800000).toISOString(), amount: 20.00, type: 'expense', category: 'Software', description: 'Vercel Pro', currency: 'USD' },
-  { id: crypto.randomUUID(), date: new Date(Date.now() - 259200000).toISOString(), amount: 45.00, type: 'expense', category: 'Transport', description: 'Uber Rides', currency: 'USD' },
+  { id: crypto.randomUUID(), date: new Date().toISOString(), amount: 3200.00, type: 'income', category: 'Freelance', description: 'Stripe', currency: 'USD' },
+  { id: crypto.randomUUID(), date: new Date(Date.now() - 86400000).toISOString(), amount: 142.50, type: 'expense', category: 'Software', description: 'AWS', currency: 'USD' },
+  { id: crypto.randomUUID(), date: new Date(Date.now() - 172800000).toISOString(), amount: 20.00, type: 'expense', category: 'Software', description: 'Vercel', currency: 'USD' },
+  { id: crypto.randomUUID(), date: new Date(Date.now() - 259200000).toISOString(), amount: 45.00, type: 'expense', category: 'Transport', description: 'Uber', currency: 'USD' },
 ];
 
-export const useTransactionStore = create<TransactionState>((set, get) => ({
-  transactions: INITIAL_TRANSACTIONS,
-  isLoading: false,
-  error: null,
+export const useTransactionStore = create<TransactionState>()(
+  persist(
+    (set) => ({
+      transactions: INITIAL_TRANSACTIONS,
+      isLoading: false,
+      error: null,
 
-  addTransaction: (txData) => {
-    // 3. БЕЗОПАСНАЯ ГЕНЕРАЦИЯ ID И ОЧИСТКА ДАННЫХ
-    const newId = crypto.randomUUID();
-    
-    // Гарантируем, что сумма всегда положительная и округлена до копеек
-    const safeAmount = Number(Math.abs(txData.amount).toFixed(2));
-    
-    // Базовая защита даты (если пришел мусор, ставим сейчас)
-    const safeDate = Number.isNaN(Date.parse(txData.date)) 
-      ? new Date().toISOString() 
-      : new Date(txData.date).toISOString();
+      addTransaction: (txData) => {
+        // 3. БЕЗОПАСНАЯ ГЕНЕРАЦИЯ ID И ОЧИСТКА ДАННЫХ
+        const newId = crypto.randomUUID();
 
-    const newTx: Transaction = {
-      ...txData,
-      id: newId,
-      amount: safeAmount,
-      date: safeDate,
-    };
+        // Гарантируем, что сумма всегда положительная и округлена до копеек
+        const safeAmount = Number(Math.abs(txData.amount).toFixed(2));
 
-    set((state) => {
-      const newList = [newTx, ...state.transactions];
-      // 4. АВТОСОРТИРОВКА: Новые транзакции всегда сверху
-      newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      return { transactions: newList };
-    });
+        // Базовая защита даты (если пришел мусор, ставим сейчас)
+        const safeDate = Number.isNaN(Date.parse(txData.date))
+          ? new Date().toISOString()
+          : new Date(txData.date).toISOString();
 
-    return newId;
-  },
+        const newTx: Transaction = {
+          ...txData,
+          id: newId,
+          amount: safeAmount,
+          date: safeDate,
+        };
 
-  updateTransaction: (id, updates) => {
-    let isSuccess = false;
+        set((state) => {
+          const newList = [newTx, ...state.transactions];
+          // 4. АВТОСОРТИРОВКА: Новые транзакции всегда сверху
+          newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    set((state) => {
-      const index = state.transactions.findIndex((t) => t.id === id);
-      if (index === -1) return state; // Транзакция не найдена, ничего не делаем
+          return { transactions: newList };
+        });
 
-      isSuccess = true;
-      const txToUpdate = { ...state.transactions[index], ...updates };
+        return newId;
+      },
 
-      // Защита суммы при обновлении
-      if (updates.amount !== undefined) {
-        txToUpdate.amount = Number(Math.abs(updates.amount).toFixed(2));
-      }
+      updateTransaction: (id, updates) => {
+        let isSuccess = false;
 
-      const newList = [...state.transactions];
-      newList[index] = txToUpdate;
+        set((state) => {
+          const index = state.transactions.findIndex((t) => t.id === id);
+          if (index === -1) return state; // Транзакция не найдена, ничего не делаем
 
-      // Если изменили дату, нужно пересортировать массив
-      if (updates.date) {
-        newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      }
+          isSuccess = true;
+          const txToUpdate = { ...state.transactions[index], ...updates };
 
-      return { transactions: newList };
-    });
+          // Защита суммы при обновлении
+          if (updates.amount !== undefined) {
+            txToUpdate.amount = Number(Math.abs(updates.amount).toFixed(2));
+          }
 
-    return isSuccess;
-  },
+          const newList = [...state.transactions];
+          newList[index] = txToUpdate;
 
-  deleteTransaction: (id) => {
-    let isSuccess = false;
+          // Если изменили дату, нужно пересортировать массив
+          if (updates.date) {
+            newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          }
 
-    set((state) => {
-      const filteredList = state.transactions.filter((t) => t.id !== id);
-      
-      // Если длина не изменилась, значит такого ID не было
-      if (filteredList.length === state.transactions.length) return state;
+          return { transactions: newList };
+        });
 
-      isSuccess = true;
-      return { transactions: filteredList };
-    });
+        return isSuccess;
+      },
 
-    return isSuccess;
-  },
+      deleteTransaction: (id) => {
+        let isSuccess = false;
 
-  clearAllTransactions: () => {
-    set({ transactions: [] });
-  },
+        set((state) => {
+          const filteredList = state.transactions.filter((t) => t.id !== id);
 
-  // 5. ИНФРАСТРУКТУРА ДЛЯ РЕАЛЬНОГО API
-  fetchTransactions: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      // Имитация задержки сети
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      // Здесь будет const response = await fetch('/api/transactions');
-      set({ isLoading: false });
-    } catch (err) {
-      set({ error: 'Failed to load transactions', isLoading: false });
+          // Если длина не изменилась, значит такого ID не было
+          if (filteredList.length === state.transactions.length) return state;
+
+          isSuccess = true;
+          return { transactions: filteredList };
+        });
+
+        return isSuccess;
+      },
+
+      clearAllTransactions: () => {
+        set({ transactions: [] });
+      },
+
+      // 5. ИНФРАСТРУКТУРА ДЛЯ РЕАЛЬНОГО API
+      fetchTransactions: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          // Имитация задержки сети
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          // Здесь будет const response = await fetch('/api/transactions');
+          set({ isLoading: false });
+        } catch {
+          set({ error: 'Failed to load transactions', isLoading: false });
+        }
+      },
+    }),
+    {
+      name: 'clarity-transactions-v1',
+      version: 1,
+      // Сохраняем только данные, без служебных флагов загрузки/ошибок
+      partialize: (state) => ({ transactions: state.transactions }),
     }
-  },
-}));
+  )
+);

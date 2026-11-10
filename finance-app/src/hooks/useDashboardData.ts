@@ -1,10 +1,34 @@
-import { useMemo, useDeferredValue } from 'react';
+import { useMemo, useDeferredValue, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
 import { useTransactionStore } from '../store/useTransactionStore';
-import { useTranslation } from '../locales/translations';
 import { getCategoryMeta } from '../utils/categories';
-import { MOCK_RATES, convertAmount as sharedConvertAmount } from '../utils/currency';
+import { convertAmount as sharedConvertAmount } from '../utils/currency';
+import { useExchangeRatesStore } from '../store/useExchangeRatesStore';
 import { calculateTrend as calculateTrendResult } from '../utils/math';
+
+// Форма объекта, которую ждут StatsGrid/ChartsSection (доступ через t.xxx,
+// а не через функцию t('key') — так исторически сложилось, и переписывать
+// оба компонента ради смены i18n-движка не было смысла)
+export interface DashboardTranslations {
+  welcome: string;
+  subtitle: string;
+  baseCurrency: string;
+  addTransaction: string;
+  totalBalance: string;
+  totalIncome: string;
+  totalExpenses: string;
+  records: string;
+  vsLastPeriod: string;
+  spendingOverview: string;
+  total: string;
+  cashFlow: string;
+  income: string;
+  expenses: string;
+  noData: string;
+  ratesError: string;
+  ratesRetry: string;
+}
 
 // Тонкая обёртка вокруг общей calculateTrend (utils/math.ts): здесь нужен просто
 // процент числом для StatCard, а не весь TrendResult — семантику "хорошо/плохо"
@@ -16,18 +40,43 @@ const calculateTrend = (current: number, previous: number): number => {
 
 export function useDashboardData(searchQuery: string = '', dateFilter: string = 'month') {
   // 1. ИСПОЛЬЗУЕМ ГЛОБАЛЬНЫЕ СТОРЫ (Без селекторов всего объекта!)
-  const lang = useAppStore(s => s.lang);
+  const lang = useAppStore(s => s.lang); // Нужен для Intl/toLocaleDateString ниже, не для переводов
   const currency = useAppStore(s => s.currency);
+  const liveRates = useExchangeRatesStore(s => s.rates); // Живые курсы вместо статичного MOCK_RATES
   const transactions = useTransactionStore(s => s.transactions);
   
-  // 2. ИСПОЛЬЗУЕМ ГЛОБАЛЬНЫЙ СЛОВАРЬ (Конец дублированию)
-  const t = useTranslation(lang).dashboard;
+  // 2. i18next — собираем объект нужной формы для StatsGrid/ChartsSection
+  const { t: translate } = useTranslation();
+  const t: DashboardTranslations = useMemo(() => ({
+    welcome: translate('dashboard.welcome'),
+    subtitle: translate('dashboard.subtitle'),
+    baseCurrency: translate('dashboard.baseCurrency'),
+    addTransaction: translate('dashboard.addTransaction'),
+    totalBalance: translate('dashboard.totalBalance'),
+    totalIncome: translate('dashboard.totalIncome'),
+    totalExpenses: translate('dashboard.totalExpenses'),
+    records: translate('dashboard.records'),
+    vsLastPeriod: translate('dashboard.vsLastPeriod'),
+    spendingOverview: translate('dashboard.spendingOverview'),
+    total: translate('dashboard.total'),
+    cashFlow: translate('dashboard.cashFlow'),
+    income: translate('dashboard.income'),
+    expenses: translate('dashboard.expenses'),
+    noData: translate('dashboard.noData'),
+    ratesError: translate('dashboard.ratesError'),
+    ratesRetry: translate('dashboard.ratesRetry'),
+  }), [translate]);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // 3. БЕЗОПАСНАЯ КОНВЕРТАЦИЯ ВАЛЮТ (общая функция из utils/currency.ts)
-  const convertAmount = (amount: number, fromCur: string, toCur: string) =>
-    sharedConvertAmount(amount, fromCur, toCur, MOCK_RATES);
+  // 3. БЕЗОПАСНАЯ КОНВЕРТАЦИЯ ВАЛЮТ (общая функция из utils/currency.ts).
+  // useCallback, чтобы ссылка была стабильной и её можно было указывать
+  // в зависимостях useMemo без лишних пересчётов.
+  const convertAmount = useCallback(
+    (amount: number, fromCur: string, toCur: string) =>
+      sharedConvertAmount(amount, fromCur, toCur, liveRates),
+    [liveRates]
+  );
 
   // 4. БЕЗОПАСНОЕ ФОРМАТИРОВАНИЕ ДЕНЕГ
   const formatMoneyString = (amount: number, curCode: string) => {
@@ -39,7 +88,7 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       }).format(amount);
-    } catch (e) {
+    } catch {
       return `${amount.toFixed(2)} ${curCode}`;
     }
   };
@@ -49,8 +98,8 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
     const now = new Date();
     const query = deferredSearchQuery.toLowerCase();
     
-    let current: typeof transactions = [];
-    let previous: typeof transactions = [];
+    const current: typeof transactions = [];
+    const previous: typeof transactions = [];
 
     // Фильтр по поиску (общий для всех дат)
     const baseFiltered = transactions.filter(tx => 
@@ -133,12 +182,11 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
       .map(([name, value]) => {
         const meta = getCategoryMeta(name);
         // Достаем hex-код из Tailwind классов (упрощенно для графика)
-        const colorHash = meta.color.includes('rose') ? '#f43f5e' : meta.color.includes('indigo') ? '#6366f1' : meta.color.includes('orange') ? '#f97316' : '#10b981';
-        return { name, value, color: colorHash };
+        return { name, value, color: meta.hex };
       })
       .sort((a, b) => b.value - a.value)
       .slice(0, 5); // Топ 5 категорий
-  }, [currentTxs, currency]);
+  }, [currentTxs, currency, convertAmount]);
 
   // 9. РЕАЛЬНЫЕ ДАННЫЕ ДЛЯ AREA CHART (График за последние 7 дней)
   const areaData = useMemo(() => {
@@ -163,9 +211,8 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
       date,
       income: stats.income,
       expense: stats.expense,
-      prevExpense: stats.expense * 0.9 // Имитация прошлой недели для красоты линии
     })).slice(-7); // Только 7 последних дней
-  }, [currentTxs, currency, lang]);
+  }, [currentTxs, currency, lang, convertAmount]);
 
   return {
     t,
@@ -175,7 +222,7 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
     displayExpenses: currentStats.expenses,
     trends,
     formatMoneyString,
-    rates: MOCK_RATES,
+    rates: liveRates,
     pieData,
     areaData
   };

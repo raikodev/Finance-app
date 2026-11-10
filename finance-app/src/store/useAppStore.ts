@@ -3,7 +3,11 @@ import { persist } from 'zustand/middleware';
 
 // 1. СТРОГИЕ ТИПЫ (Никаких произвольных строк)
 export type AppLanguage = 'en' | 'pl' | 'ru';
-export type AppCurrency = 'USD' | 'EUR' | 'RUB' | 'PLN';
+export type AppCurrency =
+  | 'USD' | 'EUR' | 'JPY' | 'GBP' | 'CHF' | 'CNY' | 'AUD' | 'CAD' | 'NZD'
+  | 'SEK' | 'NOK' | 'DKK' | 'PLN' | 'CZK' | 'HUF' | 'RON' | 'ISK'
+  | 'TRY' | 'BRL' | 'MXN' | 'ZAR' | 'INR' | 'KRW' | 'SGD' | 'HKD' | 'IDR'
+  | 'ILS' | 'MYR' | 'PHP' | 'THB' | 'RUB' | 'BYN';
 
 interface AppState {
   // Данные
@@ -18,18 +22,30 @@ interface AppState {
   resetSettings: () => void; // Метод для сброса настроек
 }
 
-// 2. УМНЫЙ ДЕФОЛТ (Слушаем систему пользователя)
 const getSystemTheme = (): boolean => {
-  // Проверка на typeof window нужна для безопасного SSR (если в будущем будет Next.js)
   if (typeof window !== 'undefined') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
-  return true; // Fallback на тёмную тему по умолчанию
+  return true;
+};
+
+// Определяем язык браузера/ОС пользователя при самом первом визите.
+// Работает ОДИН раз — как только пользователь явно выберет язык (setLang) или
+// он уже сохранён в localStorage, persist-мидлвар зустанда восстановит именно
+// сохранённое значение, а этот дефолт больше не используется.
+const getSystemLanguage = (): AppLanguage => {
+  if (typeof navigator !== 'undefined') {
+    const browserLang = navigator.language?.split('-')[0].toLowerCase();
+    if (browserLang === 'ru' || browserLang === 'pl' || browserLang === 'en') {
+      return browserLang;
+    }
+  }
+  return 'en'; // Фоллбэк для неподдерживаемых языков (например, немецкий, французский)
 };
 
 const DEFAULT_SETTINGS = {
   isDarkMode: getSystemTheme(),
-  lang: 'en' as AppLanguage,
+  lang: getSystemLanguage(),
   currency: 'USD' as AppCurrency,
 };
 
