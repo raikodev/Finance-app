@@ -1,18 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Globe, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { Plus, Globe, ChevronDown, AlertTriangle, RefreshCw } from 'lucide-react';
 
 // Импорт сторов
 import { useAppStore, type AppLanguage, type AppCurrency } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useTransactionStore, type Transaction } from '../store/useTransactionStore';
+import { useExchangeRatesStore } from '../store/useExchangeRatesStore';
 import { useDashboardData } from '../hooks/useDashboardData';
 
 // Компоненты
 import StatsGrid from '../components/StatsGrid';
-import ChartsSection from '../components/ChartsSection';
 import AIHub from '../components/AIHub';
 import { TransactionModal } from '../components/TransactionModal';
 import TransactionList from '../components/TransactionList';
+
+// recharts тяжёлый (~300 kB), поэтому графики грузим отдельным чанком
+// уже после первого рендера дашборда.
+const ChartsSection = lazy(() => import('../components/ChartsSection'));
+
+// Скелетон повторяет сетку графиков, чтобы контент не «прыгал» при загрузке чанка.
+const ChartsSkeleton = () => (
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full" aria-hidden="true">
+    <div className="lg:col-span-1 min-h-[320px] rounded-2xl border border-gray-200 dark:border-white/5 bg-white dark:bg-[#121214] shadow-sm animate-pulse" />
+    <div className="lg:col-span-2 min-h-[320px] rounded-2xl border border-gray-200 dark:border-white/5 bg-white dark:bg-[#121214] shadow-sm animate-pulse" />
+  </div>
+);
 
 export default function Dashboard() {
   // 1. ГЛОБАЛЬНЫЕ СТОРЫ
@@ -20,6 +32,9 @@ export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const addTransaction = useTransactionStore((state) => state.addTransaction);
   const deleteTransaction = useTransactionStore((state) => state.deleteTransaction);
+  const ratesError = useExchangeRatesStore((state) => state.error);
+  const ratesLoading = useExchangeRatesStore((state) => state.isLoading);
+  const fetchRates = useExchangeRatesStore((state) => state.fetchRates);
 
   // 2. ДАННЫЕ ДАШБОРДА
   const {
@@ -151,6 +166,7 @@ export default function Dashboard() {
             {/* z-[200] и без overscroll-contain (фиксы скролла) */}
             {activeDropdown === 'currency' && (
               <div
+               data-lenis-prevent
                onWheel={(e) => e.stopPropagation()}
                className="absolute right-0 top-full mt-2 w-24 max-h-48 overflow-y-auto bg-white dark:bg-[#1A1A1D] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-[200]"
                >
@@ -168,6 +184,24 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Индикатор проблемы с курсами: клик = принудительный retry */}
+          {ratesError && (
+            <button
+              onClick={() => fetchRates(true)}
+              disabled={ratesLoading}
+              title={t.ratesError}
+              aria-label={t.ratesError}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 disabled:opacity-60 disabled:cursor-wait transition-colors shrink-0"
+            >
+              {ratesLoading ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <AlertTriangle size={14} />
+              )}
+              <span className="hidden sm:inline">{t.ratesRetry}</span>
+            </button>
+          )}
 
           {/* Кнопка добавления транзакции */}
           <button 
@@ -197,13 +231,15 @@ export default function Dashboard() {
         
         {/* Графики (занимают 2/3) */}
         <div className="xl:col-span-2 h-full">
-          <ChartsSection 
-             t={t}  
-             formatMoneyString={formatMoneyString}
-             pieData={pieData}                
-             areaData={areaData}              
-             displayExpenses={displayExpenses}  
-          />
+          <Suspense fallback={<ChartsSkeleton />}>
+            <ChartsSection 
+               t={t}  
+               formatMoneyString={formatMoneyString}
+               pieData={pieData}                
+               areaData={areaData}              
+               displayExpenses={displayExpenses}  
+            />
+          </Suspense>
         </div>
         
         {/* AI Insights (занимает 1/3) */}
@@ -217,7 +253,6 @@ export default function Dashboard() {
       <div className="w-full">
         <TransactionList 
            transactions={filteredTxList} 
-           t={t}  
            // Защита от отрицательных сумм в списке
            formatAmount={(amount, cur) => formatMoneyString(Math.abs(amount), cur)} 
            onDelete={deleteTransaction}     
