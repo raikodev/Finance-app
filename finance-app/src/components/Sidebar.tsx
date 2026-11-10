@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { useTranslation } from '../locales/translations';
+import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export default function Sidebar() {
-  const lang = useAppStore(s => s.lang);
   const isDarkMode = useAppStore(s => s.isDarkMode);
   const toggleTheme = useAppStore(s => s.toggleTheme);
   
@@ -30,10 +30,11 @@ export default function Sidebar() {
   const logout = useAuthStore(s => s.logout);
   
   const navigate = useNavigate();
-  const t = useTranslation(lang);
+  const { t } = useTranslation();
   
   // Состояние мобильного меню (для планшетов/телефонов)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   const userName = user?.name || 'Guest User';
   
@@ -47,21 +48,24 @@ export default function Sidebar() {
 
   // 2. СТРУКТУРИРОВАННОЕ МЕНЮ С ПРАВИЛЬНЫМИ ИКОНКАМИ (PiggyBank для бюджетов)
   const menuItems = [
-    { path: '/dashboard', name: t.menu.dash, icon: LayoutDashboard },
-    { path: '/transactions', name: t.menu.tx, icon: Receipt },
-    { path: '/categories', name: t.menu.cat, icon: Layers },
-    { path: '/budgets', name: t.menu.bud, icon: PiggyBank },
-    { path: '/reports', name: t.menu.rep, icon: BarChart3 },
-    { path: '/ai-assistant', name: t.menu.ai, icon: Sparkles },
-    { path: '/settings', name: t.menu.set, icon: Settings },
+    { path: '/dashboard', name: t('sidebar.menu.dash'), icon: LayoutDashboard },
+    { path: '/transactions', name: t('sidebar.menu.tx'), icon: Receipt },
+    { path: '/categories', name: t('sidebar.menu.cat'), icon: Layers },
+    { path: '/budgets', name: t('sidebar.menu.bud'), icon: PiggyBank },
+    { path: '/reports', name: t('sidebar.menu.rep'), icon: BarChart3 },
+    { path: '/ai-assistant', name: t('sidebar.menu.ai'), icon: Sparkles },
+    { path: '/settings', name: t('sidebar.menu.set'), icon: Settings },
   ];
 
   const handleLogoutClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Предотвращаем клик по карточке профиля
-    if (confirm(lang === 'ru' ? 'Выйти из системы?' : 'Sign out?')) {
-      logout();
-      navigate('/auth');
-    }
+    setIsLogoutOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutOpen(false);
+    logout();
+    navigate('/'); // На лендинг, а не сразу на форму входа
   };
 
   return (
@@ -84,7 +88,7 @@ export default function Sidebar() {
           {/* Секция навигации */}
           <nav className="space-y-1">
             <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-3 mb-2">
-              {lang === 'ru' ? 'Главное меню' : lang === 'pl' ? 'Menu główne' : 'Main Menu'}
+              {t('sidebar.mainMenu')}
             </div>
             
             <AnimatePresence mode="popLayout">
@@ -129,7 +133,7 @@ export default function Sidebar() {
           >
             <div className="flex items-center gap-3">
               {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className="text-orange-500" />}
-              <span>{t.mode}</span>
+              <span>{t('sidebar.darkMode')}</span>
             </div>
           </button>
 
@@ -157,7 +161,7 @@ export default function Sidebar() {
             {/* Изолированная кнопка выхода */}
             <button
               onClick={handleLogoutClick}
-              title="Sign Out"
+              title={t('sidebar.signOut')}
               className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors shrink-0"
             >
               <LogOut size={16} />
@@ -192,7 +196,8 @@ export default function Sidebar() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="md:hidden fixed inset-x-0 top-16 bg-white dark:bg-[#0A0A0C] border-b border-gray-200 dark:border-white/10 z-30 p-4 shadow-xl flex flex-col gap-1 max-h-[calc(100vh-4rem)] overflow-y-auto"
+            data-lenis-prevent
+            className="md:hidden fixed inset-x-0 top-16 bg-white dark:bg-[#0A0A0C] border-b border-gray-200 dark:border-white/10 z-[250] p-4 shadow-xl flex flex-col gap-1 max-h-[calc(100vh-4rem)] overflow-y-auto"
           >
             {menuItems.map((item) => (
               <NavLink
@@ -219,7 +224,7 @@ export default function Sidebar() {
               className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-500 dark:text-gray-400"
             >
               {isDarkMode ? <Sun size={18} className="text-amber-500" /> : <Moon size={18} className="text-orange-500" />}
-              <span>{t.mode}</span>
+              <span>{t('sidebar.darkMode')}</span>
             </button>
 
             <button
@@ -227,7 +232,7 @@ export default function Sidebar() {
               className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-rose-500"
             >
               <LogOut size={18} />
-              <span>{lang === 'ru' ? 'Выйти' : lang === 'pl' ? 'Wyloguj' : 'Sign Out'}</span>
+              <span>{t('sidebar.signOut')}</span>
             </button>
           </motion.div>
         )}
@@ -235,6 +240,15 @@ export default function Sidebar() {
       
       {/* Отступ под мобильную шапку, чтобы контент страниц не залезал под неё */}
       <div className="md:hidden h-16 w-full" />
+
+      <ConfirmDialog
+        isOpen={isLogoutOpen}
+        title={t('sidebar.signOutConfirm')}
+        confirmLabel={t('sidebar.signOut')}
+        tone="primary"
+        onConfirm={confirmLogout}
+        onCancel={() => setIsLogoutOpen(false)}
+      />
     </>
   );
 }
