@@ -57,7 +57,6 @@ export async function scanReceiptImage(
   }
 
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     console.warn(
       '[receiptScanner] Calling Gemini directly from the client with an exposed API key. ' +
       'This is fine for local dev only — never ship this path to production.'
