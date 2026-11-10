@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, TrendingUp, TrendingDown, Clock, SearchX } from 'lucide-react';
 import type { Transaction } from '../store/useTransactionStore';
-import { getCategoryMeta, getCategoryLabel } from '../utils/categories';
+import { getCategoryMetaFromSnapshot, getCategoryLabel } from '../utils/categories';
 import { getMerchantIcon } from '../utils/merchantIcons';
 import { useAppStore } from '../store/useAppStore';
 import { useTranslation } from 'react-i18next';
@@ -74,7 +74,7 @@ export default function TransactionList({ transactions, onDelete, formatAmount }
         <AnimatePresence mode="popLayout">
           {filteredTransactions.length > 0 ? (
             filteredTransactions.map((tx) => {
-              const meta = getCategoryMeta(tx.category);
+              const meta = getCategoryMetaFromSnapshot(tx.category, tx);
               const isIncome = tx.type === 'income';
               const dateTime = formatDate(tx.date);
               

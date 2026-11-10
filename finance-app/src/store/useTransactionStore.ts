@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getCategorySnapshot } from '../utils/categories';
 
 // 1. СТРОГИЕ ТИПЫ
 export type TransactionType = 'income' | 'expense';
@@ -14,6 +15,10 @@ export interface Transaction {
   currency: string;
   needsReview?: boolean;
   rawCurrency?: string;
+  // Снапшот вида категории на момент создания операции. Благодаря ему
+  // удалённая пользовательская категория не превращается в серый «Folder».
+  categoryColor?: string;
+  categoryIcon?: string;
 }
 
 interface TransactionState {
@@ -63,6 +68,9 @@ export const useTransactionStore = create<TransactionState>()(
 
         const newTx: Transaction = {
           ...txData,
+          // Снапшот перекрывает поля из txData, чтобы цвет и иконка всегда
+          // соответствовали категории в момент создания.
+          ...getCategorySnapshot(txData.category),
           id: newId,
           amount: safeAmount,
           date: safeDate,
@@ -88,6 +96,12 @@ export const useTransactionStore = create<TransactionState>()(
 
           isSuccess = true;
           const txToUpdate = { ...state.transactions[index], ...updates };
+
+          // При смене категории обновляем и снапшот: иначе операция
+          // сохранила бы цвет и иконку прежней категории.
+          if (updates.category !== undefined) {
+            Object.assign(txToUpdate, getCategorySnapshot(updates.category));
+          }
 
           // Защита суммы при обновлении
           if (updates.amount !== undefined) {

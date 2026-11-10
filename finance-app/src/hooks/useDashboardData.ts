@@ -2,7 +2,7 @@ import { useMemo, useDeferredValue, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
 import { useTransactionStore } from '../store/useTransactionStore';
-import { getCategoryMeta } from '../utils/categories';
+import { getCategoryMetaFromSnapshot } from '../utils/categories';
 import { convertAmount as sharedConvertAmount } from '../utils/currency';
 import { useExchangeRatesStore } from '../store/useExchangeRatesStore';
 import { calculateTrend as calculateTrendResult } from '../utils/math';
@@ -172,17 +172,29 @@ export function useDashboardData(searchQuery: string = '', dateFilter: string = 
 
   // 8. ДАННЫЕ ДЛЯ PIE CHART (Интеграция с нашими едиными цветами категорий)
   const pieData = useMemo(() => {
-    const expensesByCategory: Record<string, number> = {};
+    interface CategoryTotals {
+      value: number;
+      categoryColor?: string;
+      categoryIcon?: string;
+    }
+
+    const expensesByCategory: Record<string, CategoryTotals> = {};
     currentTxs.filter(tx => tx.type === 'expense').forEach(tx => {
       const amount = convertAmount(Math.abs(tx.amount), tx.currency, currency);
-      expensesByCategory[tx.category] = (expensesByCategory[tx.category] || 0) + amount;
+      const totals = expensesByCategory[tx.category] ?? { value: 0 };
+      totals.value += amount;
+      // Запоминаем снапшот первого расхода в категории: если категорию
+      // удалят, график сохранит её цвет, а не станет серым.
+      if (!totals.categoryColor && tx.categoryColor) totals.categoryColor = tx.categoryColor;
+      if (!totals.categoryIcon && tx.categoryIcon) totals.categoryIcon = tx.categoryIcon;
+      expensesByCategory[tx.category] = totals;
     });
 
     return Object.entries(expensesByCategory)
-      .map(([name, value]) => {
-        const meta = getCategoryMeta(name);
+      .map(([name, totals]) => {
+        const meta = getCategoryMetaFromSnapshot(name, totals);
         // Достаем hex-код из Tailwind классов (упрощенно для графика)
-        return { name, value, color: meta.hex };
+        return { name, value: totals.value, color: meta.hex };
       })
       .sort((a, b) => b.value - a.value)
       .slice(0, 5); // Топ 5 категорий
