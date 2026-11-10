@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getCategorySnapshot } from '../utils/categories';
+import { migrateLegacyDemoDescriptions } from '../utils/transactionMigrations';
 
 // 1. СТРОГИЕ ТИПЫ
 export type TransactionType = 'income' | 'expense';
@@ -157,7 +158,19 @@ export const useTransactionStore = create<TransactionState>()(
     }),
     {
       name: 'clarity-transactions-v1',
-      version: 1,
+      version: 2,
+      // v2: старые демо-описания заменены нейтральными брендами. Миграция
+      // нужна только пользователям, у которых эти данные уже в localStorage.
+      migrate: (persistedState, version) => {
+        const state = (persistedState ?? {}) as { transactions?: Transaction[] };
+        if (version < 2 && Array.isArray(state.transactions)) {
+          return {
+            ...state,
+            transactions: migrateLegacyDemoDescriptions(state.transactions),
+          };
+        }
+        return state as { transactions: Transaction[] };
+      },
       // Сохраняем только данные, без служебных флагов загрузки/ошибок
       partialize: (state) => ({ transactions: state.transactions }),
     }
