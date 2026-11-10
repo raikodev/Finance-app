@@ -78,3 +78,104 @@
   Вместо <input type="number"> используйте <input type="text" inputMode="decimal" pattern="[0-9]*" />
   Это современный стандарт для финансовых приложений.
 */
+
+/* ============================================================
+   ПЕЧАТЬ ОТЧЁТА (Reports → Export PDF)
+   window.print() печатает только блок с data-print-report:
+   сайдбар, шапка и кнопки на бумагу не попадают.
+   :has() гарантирует, что правила не ломают печать других страниц.
+   ============================================================ */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body:has([data-print-report]) {
+    background: #ffffff !important;
+  }
+
+  /* Скрываем весь интерфейс, кроме самого отчёта */
+  body:has([data-print-report]) * {
+    visibility: hidden;
+  }
+
+  body:has([data-print-report]) [data-print-report],
+  body:has([data-print-report]) [data-print-report] * {
+    visibility: visible;
+  }
+
+  body:has([data-print-report]) [data-print-report] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Кнопки и интерактив не печатаем */
+  body:has([data-print-report]) [data-print-hide],
+  body:has([data-print-report]) [data-print-report] button {
+    display: none !important;
+  }
+
+  /* Принудительно светлая печать даже в тёмной теме */
+  body:has([data-print-report]) [data-print-report],
+  body:has([data-print-report]) [data-print-report] * {
+    background-color: transparent !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has([data-print-report]) [data-print-report] {
+    background-color: #ffffff !important;
+  }
+
+  /* Цветные бары и легенда должны остаться цветными */
+  body:has([data-print-report]) [data-print-report] .bg-emerald-500 {
+    background-color: #10b981 !important;
+  }
+
+  body:has([data-print-report]) [data-print-report] .bg-rose-500 {
+    background-color: #f43f5e !important;
+  }
+
+  body:has([data-print-report]) [data-print-report] .text-emerald-400,
+  body:has([data-print-report]) [data-print-report] .dark\:text-emerald-400,
+  body:has([data-print-report]) [data-print-report] .dark\:text-emerald-600 {
+    color: #10b981 !important;
+  }
+
+  body:has([data-print-report]) [data-print-report] .text-rose-400,
+  body:has([data-print-report]) [data-print-report] .dark\:text-rose-400,
+  body:has([data-print-report]) [data-print-report] .dark\:text-rose-600 {
+    color: #f43f5e !important;
+  }
+
+  /* Карточки не должны разрываться между страницами */
+  body:has([data-print-report]) [data-print-report] > * {
+    break-inside: avoid;
+  }
+}
+/* Уважаем системную настройку «уменьшить движение»: гасим CSS-анимации
+   и переходы. JS-анимации framer-motion отключает MotionConfig reducedMotion="user". */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
