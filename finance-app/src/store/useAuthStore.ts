@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 
 // 1. СТРОГИЕ РОЛИ И ТИПЫ
 export type Role = 'guest' | 'user' | 'admin';
@@ -31,7 +31,7 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 часа
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       isLoading: false,
       error: null,
@@ -60,8 +60,8 @@ export const useAuthStore = create<AuthState>()(
             },
             sessionExpiresAt: Date.now() + SESSION_DURATION,
           });
-        } catch (err: any) {
-          set({ error: err.message || 'Login failed' });
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Login failed' });
         } finally {
           set({ isLoading: false });
         }
