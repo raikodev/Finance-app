@@ -4,7 +4,9 @@ import {
 } from 'recharts';
 import { PieChart as PieChartIcon, Activity } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import type { TranslationDictionary } from '../locales/translations';
+import type { DashboardTranslations } from '../hooks/useDashboardData';
+import { useTranslation } from 'react-i18next';
+import { getCategoryLabel } from '../utils/categories';
 
 // 1. СТРОГИЕ ИНТЕРФЕЙСЫ (Никаких any)
 interface ChartData {
@@ -24,7 +26,7 @@ interface ChartsSectionProps {
   areaData: ChartData[];
   displayExpenses: number;
   formatMoneyString: (amount: number, currency: string) => string;
-  t: TranslationDictionary['dashboard'];
+  t: DashboardTranslations;
 }
 
 interface CustomTooltipProps {
@@ -38,6 +40,47 @@ interface CustomTooltipProps {
   label?: string;
 }
 
+interface CustomAreaTooltipProps extends CustomTooltipProps {
+  incomeLabel: string;
+  expensesLabel: string;
+  currency: string;
+  formatMoneyString: (amount: number, currency: string) => string;
+}
+
+// Компонент объявлен на уровне модуля, а не внутри ChartsSection: иначе он
+// создаётся заново на каждый рендер и теряет состояние (react-hooks/static-components).
+const CustomAreaTooltip = ({
+  active,
+  payload,
+  label,
+  incomeLabel,
+  expensesLabel,
+  currency,
+  formatMoneyString,
+}: CustomAreaTooltipProps) => {
+  if (!active || !payload || !payload.length) return null;
+
+  return (
+    <div className="bg-white dark:bg-[#1A1A1D] border border-gray-200 dark:border-white/10 p-3 rounded-xl shadow-lg">
+      <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">{label}</p>
+      <div className="space-y-1">
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2 text-xs font-medium">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-gray-500 capitalize">
+              {/* Локализация названия линий в тултипе */}
+              {entry.dataKey === 'income' ? incomeLabel : expensesLabel}:
+            </span>
+            <span className="text-gray-900 dark:text-white font-bold">
+              {formatMoneyString(Number(entry.value || 0), currency)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function ChartsSection({ 
   pieData, 
   areaData, 
@@ -47,8 +90,9 @@ export default function ChartsSection({
 }: ChartsSectionProps) {
   const currency = useAppStore(s => s.currency);
   const lang = useAppStore(s => s.lang);
+  const { t: tI18n } = useTranslation();
 
-  // 2. МУЛЬТИЯЗЫЧНЫЙ Y-AXIS (1.5k -> 1,5 тыс. -> 1,5 tys.)
+  // 3. Мультиязычный Y-axis (1.5k -> 1,5 тыс. -> 1,5 tys.)
   const formatTick = (value: number) => {
     if (value === 0) return '0';
     if (lang === 'ru') {
@@ -64,30 +108,7 @@ export default function ChartsSection({
     return value.toString();
   };
 
-  // 3. СТРОГО ТИПИЗИРОВАННЫЙ ТУЛТИП (Без any!)
-  const CustomAreaTooltip = ({ active, payload, label }: CustomTooltipProps) => {
-    if (!active || !payload || !payload.length) return null;
-
-    return (
-      <div className="bg-white dark:bg-[#1A1A1D] border border-gray-200 dark:border-white/10 p-3 rounded-xl shadow-lg">
-        <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">{label}</p>
-        <div className="space-y-1">
-          {payload.map((entry, index) => (
-            <div key={index} className="flex items-center gap-2 text-xs font-medium">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-              <span className="text-gray-500 capitalize">
-                {/* 4. Локализация названия линий в тултипе */}
-                {entry.dataKey === 'income' ? t.income : t.expenses}:
-              </span>
-              <span className="text-gray-900 dark:text-white font-bold">
-                {formatMoneyString(Number(entry.value || 0), currency)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  // 3. Названия линий берём из локалей — передаём их в тултип пропсами
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
@@ -136,7 +157,7 @@ export default function ChartsSection({
                 <div key={idx} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-gray-600 dark:text-gray-300 font-medium">{item.name}</span>
+                    <span className="text-gray-600 dark:text-gray-300 font-medium">{getCategoryLabel(tI18n, item.name)}</span>
                   </div>
                   <span className="font-bold text-gray-900 dark:text-white">
                     {formatMoneyString(item.value, currency)}
@@ -200,7 +221,17 @@ export default function ChartsSection({
                   axisLine={false}
                   dx={-10}
                 />
-                <Tooltip content={<CustomAreaTooltip />} cursor={{ stroke: '#6b7280', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                <Tooltip
+                  content={
+                    <CustomAreaTooltip
+                      incomeLabel={t.income}
+                      expensesLabel={t.expenses}
+                      currency={currency}
+                      formatMoneyString={formatMoneyString}
+                    />
+                  }
+                  cursor={{ stroke: '#6b7280', strokeWidth: 1, strokeDasharray: '4 4' }}
+                />
                 <Area 
                   type="monotone" 
                   dataKey="income" 
