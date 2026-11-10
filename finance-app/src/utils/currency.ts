@@ -13,8 +13,27 @@
 // (например, exchangerate-api.com), обновляемые периодически.
 // ============================================================================
 
+import type { AppCurrency } from '../store/useAppStore';
+
+export const SUPPORTED_CURRENCIES: AppCurrency[] = [
+  'USD', 'EUR', 'JPY', 'GBP', 'CHF', 'CNY', 'AUD', 'CAD', 'NZD',
+  'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'ISK', 'TRY', 
+  'BRL', 'MXN', 'ZAR', 'INR', 'KRW', 'SGD', 'HKD', 'IDR', 'ILS', 
+  'MYR', 'PHP', 'THB', 'RUB', 'BYN',
+];
+
+/** Проверяет, что строка — одна из реально поддерживаемых валют */
+export function isSupportedCurrency(code: string): code is AppCurrency {
+  return (SUPPORTED_CURRENCIES as string[]).includes(code);
+}
+
 export const MOCK_RATES: Record<string, number> = {
-  USD: 1, EUR: 0.92, GBP: 0.79, PLN: 4.01, RUB: 92.5, UAH: 39.5
+  USD: 1, EUR: 0.92, JPY: 149, GBP: 0.79, CHF: 0.88, CNY: 7.1,
+  AUD: 1.52, CAD: 1.36, NZD: 1.66, SEK: 10.4, NOK: 10.6, DKK: 6.86,
+  PLN: 4.01, CZK: 23.5, HUF: 356, RON: 4.58, BGN: 1.80, ISK: 138,
+  TRY: 34.2, BRL: 5.1, MXN: 17.0, ZAR: 18.2, INR: 83.3, KRW: 1330,
+  SGD: 1.34, HKD: 7.82, IDR: 15700, ILS: 3.75, MYR: 4.47, PHP: 56.5,
+  THB: 35.0, RUB: 90, BYN: 3.2,
 };
 
 /**

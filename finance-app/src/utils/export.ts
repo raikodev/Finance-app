@@ -5,12 +5,58 @@ export interface Transaction {
   amount: number;
   type: 'income' | 'expense' | string;
   category: string;
+  currency?: string;
   description?: string;
 }
 
-interface ExportOptions {
+// Подписи колонок и служебные сообщения передаются снаружи, чтобы CSV
+// был локализован так же, как интерфейс (а не захардкожен на английском).
+export interface ExportLabels {
+  date: string;
+  type: string;
+  category: string;
+  amount: string;
+  currency: string;
+  description: string;
+  income: string;
+  expense: string;
+  empty: string;
+  failed: string;
+}
+
+const DEFAULT_LABELS: ExportLabels = {
+  date: 'Date',
+  type: 'Type',
+  category: 'Category',
+  amount: 'Amount',
+  currency: 'Currency',
+  description: 'Description',
+  income: 'Income',
+  expense: 'Expense',
+  empty: 'No transactions to export.',
+  failed: 'Failed to generate CSV file. Please try again.',
+};
+
+type Translate = (key: string) => string;
+
+// Хелпер, чтобы страницы не дублировали сборку объекта подписей.
+export const getExportLabels = (t: Translate): ExportLabels => ({
+  date: t('export.date'),
+  type: t('export.type'),
+  category: t('export.category'),
+  amount: t('export.amount'),
+  currency: t('export.currency'),
+  description: t('export.description'),
+  income: t('export.income'),
+  expense: t('export.expense'),
+  empty: t('export.empty'),
+  failed: t('export.failed'),
+});
+
+export interface ExportOptions {
   filename?: string;
   delimiter?: string; // Полезно для европейских Excel, где нужен ';'
+  labels?: Partial<ExportLabels>;
 }
 
 /**
@@ -37,45 +83,60 @@ const sanitizeCSVCell = (val: string | number | undefined | null): string => {
 
 /**
  * Главная функция экспорта
- * Возвращает объект с результатом, чтобы UI мог показать Toast вместо alert()
+ * Возвращает код ошибки вместо текста, чтобы UI перевёл сообщение сам.
  */
 export const downloadCSV = (
   transactions: Transaction[],
   options?: ExportOptions
-): { success: boolean; message?: string } => {
-  
+): { success: boolean; error?: 'empty' | 'failed' } => {
+  const labels: ExportLabels = { ...DEFAULT_LABELS, ...options?.labels };
+
   // 3. ОТКАЗ ОТ alert()
   if (!transactions || transactions.length === 0) {
-    return { success: false, message: 'No transactions to export.' };
+    return { success: false, error: 'empty' };
   }
 
   const delimiter = options?.delimiter || ',';
-  
+
   // 4. ДИНАМИЧЕСКОЕ ИМЯ ФАЙЛА (С защитой от перезаписи)
   const dateSuffix = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
   const timeSuffix = new Date().toTimeString().split(' ')[0].replace(/:/g, '');
   const filename = options?.filename || `finance_export_${dateSuffix}_${timeSuffix}.csv`;
 
   try {
-    // Гибкие заголовки
-    const headers = ['Date', 'Type', 'Category', 'Amount', 'Description'];
+    // Гибкие заголовки (уже локализованные)
+    const headers = [
+      labels.date,
+      labels.type,
+      labels.category,
+      labels.amount,
+      labels.currency,
+      labels.description,
+    ];
 
     // 5. БЕЗОПАСНЫЙ МАППИНГ ДАННЫХ
     const rows = transactions.map(tx => {
       // Стандартизированная дата ISO 8601 (YYYY-MM-DD) для консистентности в любых локалях
-      let safeDate = '';
+      let safeDate: string;
       try {
         safeDate = tx.date ? new Date(tx.date).toISOString().split('T')[0] : '';
-      } catch (e) {
+      } catch {
         safeDate = 'Invalid Date';
       }
 
+      const typeLabel = tx.type === 'income'
+        ? labels.income
+        : tx.type === 'expense'
+          ? labels.expense
+          : tx.type;
+
       return [
         safeDate,
-        sanitizeCSVCell(tx.type),
+        sanitizeCSVCell(typeLabel),
         sanitizeCSVCell(tx.category),
         sanitizeCSVCell(tx.amount),
-        sanitizeCSVCell(tx.description)
+        sanitizeCSVCell(tx.currency),
+        sanitizeCSVCell(tx.description),
       ].join(delimiter);
     });
 
@@ -101,6 +162,6 @@ export const downloadCSV = (
     return { success: true };
   } catch (error) {
     console.error('CSV Export Error:', error);
-    return { success: false, message: 'Failed to generate CSV file. Please try again.' };
+    return { success: false, error: 'failed' };
   }
 };
