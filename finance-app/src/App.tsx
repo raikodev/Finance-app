@@ -7,6 +7,7 @@ import Lenis from 'lenis';
 import i18n from './i18n';
 import { useTranslation } from 'react-i18next';
 import { useExchangeRatesStore } from './store/useExchangeRatesStore';
+import { useSessionExpiry } from './hooks/useSessionExpiry';
 
 import { useAppStore } from './store/useAppStore';
 import { useAuthStore } from './store/useAuthStore';
@@ -152,6 +153,9 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // Следим за sessionExpiresAt и разлогиниваем открытую вкладку без перезагрузки.
+  useSessionExpiry();
+
   // Загружаем живые курсы валют один раз при старте приложения. Стор сам
   // защищён от повторных запросов чаще раза в час (см. useExchangeRatesStore) —
   // безопасно вызывать даже если компонент перемонтируется.

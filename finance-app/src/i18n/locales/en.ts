@@ -235,6 +235,7 @@ export default {
     errGuestFailed: 'Failed to enter guest mode',
     recoverySent: 'Recovery email sent',
     oauthComingSoon: 'OAuth coming soon',
+    sessionExpired: 'Your session has expired. Please sign in again.',
   },
 
   settings: {
