@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Download, TrendingUp, TrendingDown, PiggyBank, Target, BarChart3 } from 'lucide-react';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
-import { convertAmount } from '../utils/currency';
+import { useTranslation } from 'react-i18next';
+import { convertAmount as sharedConvertAmount } from '../utils/currency';
+import { useExchangeRatesStore } from '../store/useExchangeRatesStore';
 import toast from 'react-hot-toast';
 
 // Полные строки классов — Tailwind не умеет резолвить bg-${color}-50 в рантайме,
@@ -17,7 +19,14 @@ const KPI_COLOR_MAP: Record<string, string> = {
 
 export default function ReportsPage() {
   const transactions = useTransactionStore((state) => state.transactions);
+  const liveRates = useExchangeRatesStore(s => s.rates);
   const { lang, currency } = useAppStore();
+  const convertAmount = useCallback(
+    (amount: number, fromCur: string, toCur: string) =>
+      sharedConvertAmount(amount, fromCur, toCur, liveRates),
+    [liveRates]
+  );
+  const { t } = useTranslation();
 
   // 1. УМНОЕ ФОРМАТИРОВАНИЕ ДЕНЕГ (С поддержкой локалей и честного минуса)
   const formatMoneySafe = (amount: number, forcePositive = false) => {
@@ -31,7 +40,7 @@ export default function ReportsPage() {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }).format(valueToFormat);
-    } catch (e) {
+    } catch {
       return `${amount.toFixed(0)} ${currency}`;
     }
   };
@@ -62,7 +71,7 @@ export default function ReportsPage() {
       data.push({ date: d, monthKey, income, expense });
     }
     return data;
-  }, [transactions, currency]); // currency важна для конвертации
+  }, [transactions, currency, convertAmount]); // currency и convertAmount важны для конвертации
 
   // Шаг Б: Локализуем метки для графика
   const chartData = useMemo(() => {
@@ -85,7 +94,7 @@ export default function ReportsPage() {
     const savingsRate = totalIncome > 0 ? ((net) / totalIncome) * 100 : 0;
 
     return { totalIncome, totalExpense, net, savingsRate };
-  }, [transactions, currency]);
+    }, [transactions, currency, convertAmount]);
 
   // 4. ДИНАМИЧЕСКАЯ ШКАЛА Y (Защита от Infinity)
   const maxChartValue = useMemo(() => {
@@ -99,10 +108,10 @@ export default function ReportsPage() {
   // 5. РЕАЛЬНЫЙ ЭКСПОРТ (Используем нативную печать браузера для "PDF")
   const handleExportPDF = () => {
     if (transactions.length === 0) {
-      toast.error('No data to export!');
+      toast.error(t('reports.noDataToExport'));
       return;
     }
-    toast.success('Preparing PDF Document...');
+    toast.success(t('reports.preparingPdf'));
     setTimeout(() => window.print(), 500); 
   };
 
@@ -113,49 +122,50 @@ export default function ReportsPage() {
         <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
           <BarChart3 className="text-gray-400" size={32} />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Reports Available</h2>
-        <p className="text-gray-500 max-w-md">Add some transactions in the Dashboard to see your financial analytics, cash flow charts, and savings rates.</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('reports.noDataTitle')}</h2>
+        <p className="text-gray-500 max-w-md">{t('reports.noDataDesc')}</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto pb-10 space-y-8">
+    <div data-print-report className="w-full max-w-5xl mx-auto pb-10 space-y-8">
       {/* Шапка */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Financial Reports</h1>
-          <p className="text-gray-500 text-sm">Analytics and insights across all your accounts</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
+          <p className="text-gray-500 text-sm">{t('reports.subtitle')}</p>
         </div>
         <button 
+          data-print-hide
           onClick={handleExportPDF}
           className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors shadow-sm"
         >
           <Download size={16} />
-          <span>Export PDF</span>
+          <span>{t('reports.exportPdf')}</span>
         </button>
       </div>
 
       {/* Карточки KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Income', value: formatMoneySafe(globalStats.totalIncome, true), icon: TrendingUp, color: 'emerald' },
-          { label: 'Total Expenses', value: formatMoneySafe(globalStats.totalExpense, true), icon: TrendingDown, color: 'rose' },
+          { key: 'income', label: t('reports.totalIncome'), value: formatMoneySafe(globalStats.totalIncome, true), icon: TrendingUp, color: 'emerald' },
+          { key: 'expenses', label: t('reports.totalExpenses'), value: formatMoneySafe(globalStats.totalExpense, true), icon: TrendingDown, color: 'rose' },
           // ЗДЕСЬ ИСПРАВЛЕН БАГ УБЫТКА: net может быть с минусом, и мы его не скрываем!
-          { label: 'Net Savings', value: formatMoneySafe(globalStats.net), icon: PiggyBank, color: globalStats.net >= 0 ? 'indigo' : 'rose' },
-          { label: 'Savings Rate', value: `${globalStats.savingsRate.toFixed(1)}%`, icon: Target, color: 'blue' }
+          { key: 'net', label: t('reports.netSavings'), value: formatMoneySafe(globalStats.net), icon: PiggyBank, color: globalStats.net >= 0 ? 'indigo' : 'rose' },
+          { key: 'rate', label: t('reports.savingsRate'), value: `${globalStats.savingsRate.toFixed(1)}%`, icon: Target, color: 'blue' }
         ].map((stat, i) => (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            key={stat.label}
+            key={stat.key}
             className="bg-white dark:bg-[#121214] p-5 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm"
           >
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                <h3 className={`text-2xl font-bold mt-1 ${stat.color === 'rose' && stat.label === 'Net Savings' ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
+                <h3 className={`text-2xl font-bold mt-1 ${stat.color === 'rose' && stat.key === 'net' ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
                   {stat.value}
                 </h3>
               </div>
@@ -169,7 +179,7 @@ export default function ReportsPage() {
 
       {/* График Cash Flow */}
       <div className="bg-white dark:bg-[#121214] p-6 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Cash Flow (Last 6 Months)</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">{t('reports.cashFlowTitle')}</h3>
         
         <div className="relative h-64 mt-4 flex items-end gap-2 sm:gap-6 pt-4 pr-2">
           
@@ -237,11 +247,11 @@ export default function ReportsPage() {
         <div className="flex justify-center gap-6 mt-8 border-t border-gray-100 dark:border-white/5 pt-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-            <span className="text-sm text-gray-600 dark:text-gray-400">Income</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('reports.income')}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-            <span className="text-sm text-gray-600 dark:text-gray-400">Expense</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('reports.expense')}</span>
           </div>
         </div>
       </div>

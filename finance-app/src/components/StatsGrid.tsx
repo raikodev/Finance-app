@@ -1,7 +1,7 @@
 import { Wallet, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import StatCard from './StatCard';
 import { useAppStore } from '../store/useAppStore';
-import type { TranslationDictionary } from '../locales/translations';
+import type { DashboardTranslations } from '../hooks/useDashboardData';
 
 interface StatsGridProps {
   displayBalance: number;
@@ -16,7 +16,7 @@ interface StatsGridProps {
   };
   formatMoneyString: (amount: number, currency: string) => string;
   currency: string;
-  t: TranslationDictionary['dashboard'];
+  t: DashboardTranslations;
 }
 
 export default function StatsGrid({
@@ -35,7 +35,7 @@ export default function StatsGrid({
     try {
       const locale = lang === 'ru' ? 'ru-RU' : lang === 'pl' ? 'pl-PL' : 'en-US';
       return new Intl.NumberFormat(locale).format(num || 0);
-    } catch (e) {
+    } catch {
       return (num || 0).toString();
     }
   };

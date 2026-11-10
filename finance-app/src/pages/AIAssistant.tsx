@@ -4,45 +4,16 @@ import { Send, Bot, Sparkles, Trash2 } from 'lucide-react';
 import { useChatStore } from '../store/useChatStore';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { useAppStore } from '../store/useAppStore';
-import { convertAmount } from '../utils/currency';
+import { useTranslation } from 'react-i18next';
+import { convertAmount as sharedConvertAmount } from '../utils/currency';
+import { useExchangeRatesStore } from '../store/useExchangeRatesStore';
 
-// 1. СЛОВАРИ И ПЕРЕВОДЫ (Локализация)
-const DICTIONARY = {
-  en: {
-    placeholder: 'Ask about your finances...',
-    greeting: 'Hello! I am Clarity AI. Ask me about your spending, income, or specific categories like "food" or "transport".',
-    typing: 'Clarity AI is thinking...',
-    clearChat: 'Clear chat',
-    fallback: 'I can analyze your total expenses, income, or specific categories. Try asking: "How much did I spend on food?"',
-    respExpense: 'Your total expenses amount to',
-    respIncome: 'Your total income is',
-    respCategory: 'Your expenses for'
-  },
-  ru: {
-    placeholder: 'Спросите о ваших финансах...',
-    greeting: 'Привет! Я Clarity AI. Спросите меня о расходах, доходах или конкретных категориях, например "еда" или "транспорт".',
-    typing: 'Clarity AI анализирует...',
-    clearChat: 'Очистить чат',
-    fallback: 'Я могу проанализировать ваши расходы, доходы или конкретные категории. Спросите: "Сколько я потратил на еду?"',
-    respExpense: 'Сумма ваших расходов составляет',
-    respIncome: 'Сумма ваших доходов составляет',
-    respCategory: 'Ваши расходы на'
-  },
-  pl: {
-    placeholder: 'Zapytaj o swoje finanse...',
-    greeting: 'Cześć! Jestem Clarity AI. Zapytaj mnie o wydatki, dochody lub konkretne kategorie, np. "jedzenie".',
-    typing: 'Clarity AI myśli...',
-    clearChat: 'Wyczyść czat',
-    fallback: 'Mogę przeanalizować Twoje wydatki, dochody lub kategorie. Zapytaj: "Ile wydałem na jedzenie?"',
-    respExpense: 'Suma Twoich wydatków to',
-    respIncome: 'Suma Twoich dochodów to',
-    respCategory: 'Twoje wydatki na'
-  }
-};
-
-export default function AIHub() {
+export default function AIAssistant() {
+  const liveRates = useExchangeRatesStore(s => s.rates);
   const { lang, currency } = useAppStore();
-  const t = DICTIONARY[lang];
+  const convertAmount = (amount: number, fromCur: string, toCur: string) =>
+    sharedConvertAmount(amount, fromCur, toCur, liveRates);
+  const { t } = useTranslation();
   const transactions = useTransactionStore((state) => state.transactions);
   
   // Подключаем наш новый безопасный стор чата
@@ -68,7 +39,7 @@ export default function AIHub() {
         currency: currency,
         minimumFractionDigits: 2,
       }).format(amount);
-    } catch (e) {
+    } catch {
       return `${amount.toFixed(2)} ${currency}`;
     }
   };
@@ -89,19 +60,19 @@ export default function AIHub() {
 
     // Простые паттерны для локального "ИИ"
     if (q.includes('expense') || q.includes('расход') || q.includes('wydat')) {
-      return `${t.respExpense} ${formatMoneySafe(calculateTotal('expense'))}.`;
+      return `${t('aiAssistant.respExpense')} ${formatMoneySafe(calculateTotal('expense'))}.`;
     }
     if (q.includes('income') || q.includes('доход') || q.includes('dochod') || q.includes('przych')) {
-      return `${t.respIncome} ${formatMoneySafe(calculateTotal('income'))}.`;
+      return `${t('aiAssistant.respIncome')} ${formatMoneySafe(calculateTotal('income'))}.`;
     }
     if (q.includes('food') || q.includes('еда') || q.includes('еды') || q.includes('jedzen')) {
-      return `${t.respCategory} "Food": ${formatMoneySafe(calculateTotal('expense', 'food'))}.`;
+      return `${t('aiAssistant.respCategory')} "Food": ${formatMoneySafe(calculateTotal('expense', 'food'))}.`;
     }
     if (q.includes('transport') || q.includes('транспорт')) {
-      return `${t.respCategory} "Transport": ${formatMoneySafe(calculateTotal('expense', 'transport'))}.`;
+      return `${t('aiAssistant.respCategory')} "Transport": ${formatMoneySafe(calculateTotal('expense', 'transport'))}.`;
     }
 
-    return t.fallback;
+    return t('aiAssistant.fallback');
   };
 
   // 4. ОТПРАВКА СООБЩЕНИЯ
@@ -138,14 +109,14 @@ export default function AIHub() {
           </div>
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Clarity AI</h3>
-            <p className="text-[10px] text-gray-500 font-medium">Powered by local engine</p>
+            <p className="text-[10px] text-gray-500 font-medium">{t("aiAssistant.poweredBy")}</p>
           </div>
         </div>
         
         {messages.length > 0 && (
           <button 
             onClick={clearChat}
-            title={t.clearChat}
+            title={t('aiAssistant.clearChat')}
             className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors"
           >
             <Trash2 size={16} />
@@ -154,7 +125,7 @@ export default function AIHub() {
       </div>
 
       {/* Зона сообщений */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+      <div data-lenis-prevent className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         
         {/* Динамическое приветствие (не хранится в localStorage) */}
         {messages.length === 0 && (
@@ -163,7 +134,7 @@ export default function AIHub() {
               <Bot size={16} className="text-orange-500" />
             </div>
             <div className="bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-gray-200 p-3 rounded-2xl rounded-tl-sm text-sm border border-gray-200 dark:border-white/5">
-              {t.greeting}
+              {t('aiAssistant.greeting')}
             </div>
           </div>
         )}
@@ -209,7 +180,7 @@ export default function AIHub() {
             className="flex items-center gap-3 text-gray-400 text-xs font-medium"
           >
             <Bot size={14} className="text-orange-500 animate-pulse" />
-            {t.typing}
+            {t('aiAssistant.typing')}
           </motion.div>
         )}
         <div ref={messagesEndRef} />
@@ -223,7 +194,7 @@ export default function AIHub() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isTyping}
-            placeholder={t.placeholder}
+            placeholder={t('aiAssistant.placeholder')}
             className="w-full bg-white dark:bg-[#1A1A1D] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white pl-4 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all disabled:opacity-50 text-sm"
           />
           <button
