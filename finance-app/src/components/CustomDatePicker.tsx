@@ -112,7 +112,7 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
           if (!isOpen) setViewOverride(null);
           setIsOpen(!isOpen);
         }}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 rounded-xl text-sm font-medium hover:border-orange-500/50 dark:hover:border-orange-500/50 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+        className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-[#0A0A0C] border border-gray-200 dark:border-white/10 rounded-xl text-sm font-medium text-gray-900 dark:text-white hover:border-gray-300 dark:hover:border-white/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
       >
         <span className={selectedDate ? 'text-gray-900 dark:text-white' : 'text-gray-500'}>
           {displayValue}
@@ -120,6 +120,8 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
         <CalendarIcon size={16} className="text-gray-400" />
       </button>
 
+      {/* Попап шире триггера (280 против 220), поэтому держим его по левому
+          краю: при right-0 он уходил за левую границу модалки и обрезался. */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -127,13 +129,13 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute top-full mt-2 left-0 sm:right-0 sm:left-auto w-[280px] bg-white/95 dark:bg-[#1a1a24]/95 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] z-50 p-4 overflow-hidden"
+            className="absolute top-full mt-2 left-0 w-[280px] max-w-[calc(100vw-4rem)] bg-white/95 dark:bg-[#1a1a24]/95 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] z-50 p-4 overflow-hidden"
           >
             {/* 6. БЫСТРАЯ НАВИГАЦИЯ (Появился выбор Года и Месяца!) */}
             <div className="flex justify-between items-center mb-4 px-1">
               <button 
                 onClick={() => setViewOverride(new Date(year, month - 1, 1))} 
-                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 transition-colors"
               >
                 <ChevronLeft size={18} />
               </button>
@@ -160,7 +162,7 @@ export default function CustomDatePicker({ value, onChange, placeholder }: Custo
 
               <button 
                 onClick={() => setViewOverride(new Date(year, month + 1, 1))} 
-                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 transition-colors"
               >
                 <ChevronRight size={18} />
               </button>

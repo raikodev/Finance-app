@@ -5,6 +5,7 @@ import { useAppStore, type AppCurrency } from '../store/useAppStore';
 import type { TransactionType, Transaction } from '../store/useTransactionStore';
 import { scanReceiptImage, ReceiptScannerDisabledError, type RawScannedTransaction } from '../services/receiptScanner';
 import CustomDatePicker from './CustomDatePicker';
+import CurrencySelect from './CurrencySelect';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { parseMoneyString } from '../utils/money.ts';
@@ -242,31 +243,31 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="bg-[#121214] border border-white/10 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col focus:outline-none"
+            className="bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col focus:outline-none"
             style={{ maxHeight: '90vh' }}
           >
             {/* Header */}
-            <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#0A0A0C] shrink-0">
+            <div className="p-6 border-b border-gray-200 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-[#0A0A0C] shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-orange-500/10 rounded-xl">
                   <Bot className="text-orange-500" size={20} />
                 </div>
-                <h2 id="transaction-modal-title" className="text-xl font-bold text-white">{t('transactionModal.title')}</h2>
+                <h2 id="transaction-modal-title" className="text-xl font-bold text-gray-900 dark:text-white">{t('transactionModal.title')}</h2>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Переключатель вкладок */}
-            <div className="flex gap-1 p-1.5 mx-6 mt-4 bg-white/5 rounded-xl shrink-0">
+            <div className="flex gap-1 p-1.5 mx-6 mt-4 bg-gray-100 dark:bg-white/5 rounded-xl shrink-0">
               <button
                 onClick={() => setActiveTab('scan')}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'scan' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
+                  activeTab === 'scan' ? 'bg-orange-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 <ScanLine size={15} />
@@ -275,7 +276,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
               <button
                 onClick={() => setActiveTab('manual')}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'manual' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
+                  activeTab === 'manual' ? 'bg-orange-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 <PenLine size={15} />
@@ -292,7 +293,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
               {activeTab === 'scan' ? (
                 <>
                   {/* Warning Banner */}
-                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500 text-xs font-medium">
+                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-600 dark:text-amber-500 text-xs font-medium">
                     <AlertCircle size={16} className="shrink-0 mt-0.5" />
                     <p>{t('transactionModal.disclaimer')}</p>
                   </div>
@@ -303,7 +304,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
                     className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
                       isScanning
                         ? 'border-orange-500/30 bg-orange-500/5'
-                        : 'border-white/10 hover:border-orange-500/50 hover:bg-white/5'
+                        : 'border-gray-300 dark:border-white/10 hover:border-orange-500/50 hover:bg-gray-50 dark:hover:bg-white/5'
                     }`}
                   >
                     <input
@@ -317,14 +318,14 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
                     {isScanning ? (
                       <>
                         <Loader2 className="animate-spin text-orange-500 mb-4" size={32} />
-                        <p className="text-sm font-medium text-white">{t('transactionModal.analyze')}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{t('transactionModal.analyze')}</p>
                       </>
                     ) : (
                       <>
-                        <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                        <div className="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
                           <Upload className="text-gray-400" size={24} />
                         </div>
-                        <p className="text-sm font-medium text-white">{t('transactionModal.drag')}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{t('transactionModal.drag')}</p>
                         <p className="text-xs text-gray-500 mt-1">{t('transactionModal.formats')}</p>
                       </>
                     )}
@@ -333,7 +334,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
                   {/* Extracted Data Display */}
                   {extractedTxs.length > 0 && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-emerald-500" />
                         {t('transactionModal.recognized')}
                       </h3>
@@ -341,26 +342,26 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
                         {extractedTxs.map((tx, idx) => (
                           <div
                             key={idx}
-                            className={`flex justify-between items-center gap-2 p-3 bg-[#0A0A0C] border rounded-xl text-sm ${
-                              tx.needsReview ? 'border-amber-500/40' : 'border-white/5'
+                            className={`flex justify-between items-center gap-2 p-3 bg-gray-50 dark:bg-[#0A0A0C] border rounded-xl text-sm ${
+                              tx.needsReview ? 'border-amber-500/40' : 'border-gray-200 dark:border-white/5'
                             }`}
                           >
                             <div className="flex flex-col min-w-0">
-                              <span className="font-medium text-white truncate max-w-[200px]">{tx.description}</span>
+                              <span className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{tx.description}</span>
                               <span className="text-xs text-gray-500">{getCategoryLabel(t, tx.category)}</span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className={`font-bold ${tx.type === 'income' ? 'text-emerald-500' : 'text-white'}`}>
+                              <span className={`font-bold ${tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-900 dark:text-white'}`}>
                                 {tx.type === 'income' ? '+' : '-'}{tx.amount} {tx.needsReview ? '' : tx.currency}
                               </span>
                               {tx.needsReview && (
                                 <select
                                   value=""
                                   onChange={(e) => fixCurrency(idx, e.target.value as AppCurrency)}
-                                  className="px-2 py-1 bg-[#0A0A0C] border border-amber-500/40 rounded-lg text-xs text-amber-500 focus:outline-none"
+                                  className="px-2 py-1 bg-white dark:bg-[#0A0A0C] border border-amber-500/40 rounded-lg text-xs text-amber-600 dark:text-amber-500 focus:outline-none"
                                 >
-                                  <option value="" disabled>{tx.rawCurrency}?</option>
-                                  {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                  <option value="" disabled className="bg-white dark:bg-[#121214] text-gray-900 dark:text-white">{tx.rawCurrency}?</option>
+                                  {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c} className="bg-white dark:bg-[#121214] text-gray-900 dark:text-white">{c}</option>)}
                                 </select>
                               )}
                             </div>
@@ -380,8 +381,8 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
                       onClick={() => { setManualType('expense'); setManualCategory('Shopping'); }}
                       className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
                         manualType === 'expense'
-                          ? 'bg-rose-500/10 border-rose-500/40 text-rose-400'
-                          : 'bg-transparent border-white/10 text-gray-400 hover:border-white/20'
+                          ? 'bg-rose-500/10 border-rose-500/40 text-rose-600 dark:text-rose-400'
+                          : 'bg-transparent border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/20'
                       }`}
                     >
                       {t('transactionModal.typeExpense')}
@@ -391,8 +392,8 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
                       onClick={() => { setManualType('income'); setManualCategory('Salary'); }}
                       className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
                         manualType === 'income'
-                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                          : 'bg-transparent border-white/10 text-gray-400 hover:border-white/20'
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-transparent border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/20'
                       }`}
                     >
                       {t('transactionModal.typeIncome')}
@@ -401,57 +402,51 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
 
                   {/* Описание */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('transactionModal.fieldDescription')}</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{t('transactionModal.fieldDescription')}</label>
                     <input
                       type="text"
                       value={manualDescription}
                       onChange={(e) => setManualDescription(e.target.value)}
                       placeholder={t('transactionModal.descPlaceholder')}
                       maxLength={80}
-                      className="w-full px-4 py-2.5 bg-[#0A0A0C] border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-[#0A0A0C] border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
                     />
                   </div>
 
                   {/* Сумма + Валюта */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('transactionModal.fieldAmount')}</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{t('transactionModal.fieldAmount')}</label>
                       <input
                         type="text"
                         inputMode="decimal"
                         value={manualAmount}
                         onChange={(e) => setManualAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
                         placeholder="0.00"
-                        className="w-full px-4 py-2.5 bg-[#0A0A0C] border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-[#0A0A0C] border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('transactionModal.fieldCurrency')}</label>
-                      <select
-                        value={manualCurrency}
-                        onChange={(e) => setManualCurrency(e.target.value as AppCurrency)}
-                        className="w-full px-3 py-2.5 bg-[#0A0A0C] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-orange-500/50"
-                      >
-                        {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{t('transactionModal.fieldCurrency')}</label>
+                      <CurrencySelect value={manualCurrency} onChange={setManualCurrency} />
                     </div>
                   </div>
 
                   {/* Категория */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('transactionModal.fieldCategory')}</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{t('transactionModal.fieldCategory')}</label>
                     <select
                       value={manualCategory}
                       onChange={(e) => setManualCategory(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#0A0A0C] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-orange-500/50"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-[#0A0A0C] border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-orange-500/50"
                     >
-                      {manualCategoryOptions.map(c => <option key={c} value={c}>{getCategoryLabel(t, c)}</option>)}
+                      {manualCategoryOptions.map(c => <option key={c} value={c} className="bg-white dark:bg-[#121214] text-gray-900 dark:text-white">{getCategoryLabel(t, c)}</option>)}
                     </select>
                   </div>
 
                   {/* Дата */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('transactionModal.fieldDate')}</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{t('transactionModal.fieldDate')}</label>
                     <CustomDatePicker value={manualDate} onChange={setManualDate} />
                   </div>
                 </form>
@@ -460,7 +455,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
 
             {/* Footer Action */}
             {activeTab === 'scan' && extractedTxs.length > 0 && (
-              <div className="p-4 border-t border-white/10 bg-[#0A0A0C] shrink-0">
+              <div className="p-4 border-t border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0A0A0C] shrink-0">
                 <button
                   onClick={handleSaveAll}
                   disabled={hasUnresolved}
@@ -472,7 +467,7 @@ export const TransactionModal = ({ isOpen, onClose, onSave }: TransactionModalPr
               </div>
             )}
             {activeTab === 'manual' && (
-              <div className="p-4 border-t border-white/10 bg-[#0A0A0C] shrink-0">
+              <div className="p-4 border-t border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0A0A0C] shrink-0">
                 <button
                   type="submit"
                   form="manual-tx-form"
