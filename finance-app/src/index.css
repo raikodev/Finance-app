@@ -35,12 +35,14 @@
 
   /* 4. ЕДИНАЯ СИСТЕМА СКРОЛЛБАРОВ (CSS Variables) */
   :root {
+    color-scheme: light;
     --scrollbar-bg: transparent;
     --scrollbar-thumb: rgba(156, 163, 175, 0.5);
     --scrollbar-thumb-hover: rgba(156, 163, 175, 0.8);
   }
 
   html.dark {
+    color-scheme: dark;
     --scrollbar-thumb: rgba(255, 255, 255, 0.15);
     --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
   }

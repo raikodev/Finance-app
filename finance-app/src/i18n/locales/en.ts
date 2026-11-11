@@ -75,6 +75,8 @@ export default {
     descPlaceholder: 'e.g. Grocery shopping',
     fieldAmount: 'Amount',
     fieldCurrency: 'Currency',
+    searchCurrency: 'Search currency...',
+    noCurrencyResults: 'No currencies found.',
     fieldCategory: 'Category',
     fieldDate: 'Date',
     typeExpense: 'Expense',

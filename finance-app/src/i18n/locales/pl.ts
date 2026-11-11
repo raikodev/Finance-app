@@ -75,6 +75,8 @@ export default {
     descPlaceholder: 'np. Zakupy spożywcze',
     fieldAmount: 'Kwota',
     fieldCurrency: 'Waluta',
+    searchCurrency: 'Szukaj waluty...',
+    noCurrencyResults: 'Nie znaleziono walut.',
     fieldCategory: 'Kategoria',
     fieldDate: 'Data',
     typeExpense: 'Wydatek',

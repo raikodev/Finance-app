@@ -75,6 +75,8 @@ export default {
     descPlaceholder: 'например, Продукты',
     fieldAmount: 'Сумма',
     fieldCurrency: 'Валюта',
+    searchCurrency: 'Поиск валюты...',
+    noCurrencyResults: 'Валюты не найдены.',
     fieldCategory: 'Категория',
     fieldDate: 'Дата',
     typeExpense: 'Расход',
